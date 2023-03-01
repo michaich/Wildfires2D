@@ -1,4 +1,4 @@
-#include "Definitions.h"
+#include "SimulationData.h"
 #include "Helpers.h"
 #include <Cubism/HDF5Dumper.h>
 #include <Cubism/HDF5Dumper_MPI.h>
@@ -70,6 +70,18 @@ void SimulationData::printResetProfiler()
 {
   profiler->printSummary();
   profiler->reset();
+}
+
+double SimulationData::getH()
+{
+  double minHGrid = std::numeric_limits<double>::infinity();
+  auto & infos = T->getBlocksInfo();
+  for (size_t i = 0 ; i< infos.size(); i++)
+  {
+    minHGrid = std::min((double)infos[i].h, minHGrid);
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &minHGrid, 1, MPI_Real, MPI_MIN, comm);
+  return minHGrid;
 }
 
 void SimulationData::dumpAll(std::string name)

@@ -9,19 +9,6 @@
 #include "Operator.h"
 #include "Cubism/FluxCorrection.h"
 
-class findMaxU
-{
-  SimulationData& sim;
- public:
-  findMaxU(SimulationData& s) : sim(s) { }
-
-  Real run() const;
-
-  std::string getName() const {
-    return "findMaxU";
-  }
-};
-
 class IC : public Operator
 {
   public:

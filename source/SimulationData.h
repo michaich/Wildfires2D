@@ -1,58 +1,67 @@
 #pragma once
+using Real = double;
+#define MPI_Real MPI_DOUBLE
 
-#include "Definitions.h"
-#include "Cubism/Profiler.h"
+#include <cassert>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+#include <omp.h>
 #include <memory>
+#include <Cubism/ArgumentParser.h>
+#include <Cubism/Grid.h>
+#include <Cubism/GridMPI.h>
+#include <Cubism/BlockInfo.h>
+#include <Cubism/BlockLab.h>
+#include <Cubism/BlockLabMPI.h>
+#include <Cubism/StencilInfo.h>
+#include <Cubism/AMR_MeshAdaptation.h>
+#include <Cubism/AMR_MeshAdaptationMPI.h>
+#include <Cubism/Definitions.h>
+#include "Cubism/Profiler.h"
+
+using ScalarElement = cubism::ScalarElement<double>;
+using ScalarBlock   = cubism::GridBlock<_BS_,2,ScalarElement>;
+using ScalarGrid    = cubism::GridMPI<cubism::Grid<ScalarBlock, std::allocator>>;
+using ScalarLab     = cubism::BlockLabMPI<cubism::BlockLabNeumann  <ScalarBlock, 2,std::allocator>,ScalarGrid>;
+using ScalarAMR     = cubism::MeshAdaptationMPI<ScalarGrid,ScalarLab,ScalarGrid>;
 
 
 struct SimulationData
 {
-  // MPI
+  // MPI parameters
   MPI_Comm comm;
   int rank;
 
-  /* parsed parameters */
-  /*********************/
+  // Adaptive Mesh Refinement parameters
+  int bpdx;       // blocks in x-direction at refinement level 0
+  int bpdy;       // blocks in y-direction at refinement level 0
+  int levelMax;   // maximum number of refinement levels
+  int levelStart; // the mesh starts (at t=0) as a uniform mesh at refinement level 'levelStart'
+  double Rtol;    // refine the mesh if T(t,x,y) > Rtol
+  double Ctol;    // compress the mesh if T(t,x,y) < Ctol
+  int AdaptSteps; // check for mesh refinement/compression once every 'AdaptSteps' timesteps
+  double minH;    // minimum grid spacing possible (at level = levelmax - 1)
+  double maxH;    // maximum grid spacing possible (at level = 0)
 
-  // blocks per dimension
-  int bpdx;
-  int bpdy;
+  std::array<double,2> extents; // simulation is in rectangle [0,extents[0]] x [0,extents[1]]
+  double extent; // equal to extents[0] if bpdx > bpdy, otherwise equal to extents[1]. 
+  //User provides 'bpdx', 'bpdy' and 'extent'.
+  //'extents' are then determined from those three numbers.
 
-  // number of levels
-  int levelMax;
+  // time stepping parameters
+  double dt;       // current timestep size
+  double CFL;      // CFL condition, to determine max possible timestep
+  double endTime;  // simulation ends when t=endTime
+  double time = 0; // current time
+  int step = 0;    // current timestep number
 
-  // initial level
-  int levelStart;
-
-  // refinement/compression tolerance for voriticy magnitude
-  double Rtol;
-  double Ctol;
-
-  //check for mesh refinement every this many steps
-  int AdaptSteps;
-
-  // maximal simulation extent (direction with max(bpd))
-  double extent;
-
-  // simulation extents
-  std::array<double,2> extents;
-
-  // timestep / cfl condition
-  double dt;
-  double CFL;
-
-  // simulation ending parameters
-  int nsteps;
-  double endTime;
-
-  // output setting
-  double dumpTime;
-  bool verbose;
-  std::string path4serialization;
-  std::string path2file;
-
-  // initialize profiler
-  cubism::Profiler * profiler = new cubism::Profiler();
+  // output settings
+  double dumpTime;                                      // save the fields every 'dumpTime' time
+  bool verbose;                                         // print more screen outpout if true
+  std::string path4serialization;                       // path where all results are stored
+  cubism::Profiler * profiler = new cubism::Profiler(); // profiler to measure execution times
+  double nextDumpTime = 0;                              // time of next save
 
   // scalar fields
   ScalarGrid * T  = nullptr; //temperature
@@ -81,56 +90,62 @@ struct SimulationData
   double Ad;
 
   // initial condition parameters
-  double Ta;
-  double Ti;
-  double xcenter;
-  double ycenter;
-  double xside;
-  double yside;
+  struct InitialConditions
+  {
+    double Ta;
+    double Ti;
+    double xcenter;
+    double ycenter;
+    double xside;
+    double yside;
+  };
+  InitialConditions initialConditions;
 
-  // simulation time
-  double time = 0;
+  // velocity field parameters
+  struct VelocityField
+  {
+    double z0;
+    double lambda;
+    double alpha;
+    double kappa;
+    double u10x;
+    double u10y;
+  };
+  VelocityField velocityField;
+  double ux; // x-component of velocity field (constant, at least for now)
+  double uy; // y-component of velocity field (constant, at least for now)
 
-  // simulation step
-  int step = 0;
+  // constant terms that depend of the other parameters of the model
+  double C2;
+  double C3;
+  double C4;
+  double gamma;
+  double lambda;
 
-  // time of next dump
-  double nextDumpTime = 0;
+  // dispersion coefficients
+  double Deffx;
+  double Deffy;
 
-  // bools specifying whether we dump or not
-  bool _bDump = false;
+  // characteristic fire lengths
+  double Lcx;
+  double Lcy;
 
-  void allocateGrid();
-  bool bDump();
-  void registerDump();
-  bool bOver() const;
 
-  // minimal and maximal gridspacing possible
-  double minH;
-  double maxH;
+  void allocateGrid();                  // called when simulation starts, to allocate the gridds
+  bool bDump();                         // check if dumping of fields is needed at the current time
+  bool bOver() const;                   // check if simulation should terminate
+  double getH();                        // find smallest grid spacing currently present on the grid
+  void dumpAll(std::string name);       // save files under name 'name'
+  void startProfiler(std::string name); // start measuring execution time of 'name'
+  void stopProfiler();                  // stop measuring execution time
+  void printResetProfiler();            // print measured execution times
 
-  SimulationData();
+  SimulationData();  //class contructor
+  ~SimulationData(); //class destructor
+
+  //don't allow for copy creation of this class (to avoid bugs)
   SimulationData(const SimulationData &) = delete;
   SimulationData(SimulationData &&) = delete;
   SimulationData& operator=(const SimulationData &) = delete;
   SimulationData& operator=(SimulationData &&) = delete;
-  ~SimulationData();
-
-  // minimal gridspacing present on grid
-  double getH()
-  {
-    double minHGrid = std::numeric_limits<double>::infinity();
-    auto & infos = T->getBlocksInfo();
-    for (size_t i = 0 ; i< infos.size(); i++)
-    {
-      minHGrid = std::min((double)infos[i].h, minHGrid);
-    }
-    MPI_Allreduce(MPI_IN_PLACE, &minHGrid, 1, MPI_Real, MPI_MIN, comm);
-    return minHGrid;
-  }
-
-  void dumpAll(std::string name);
-  void startProfiler(std::string name);
-  void stopProfiler();
-  void printResetProfiler();
 };
