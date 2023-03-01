@@ -9,14 +9,6 @@
 
 using namespace cubism;
 
-static void getmaxT(double * invec, double * inoutvec, int *len, MPI_Datatype *dtype)
-{
-  if (invec[0] > inoutvec[0])
-  {
-    for (int i=0; i<*len; i++ ) inoutvec[i] = invec[i];
-  }
-}
-
 Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv)
 {
   //1. Print initial general information
@@ -161,15 +153,9 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     for (size_t c=0; c<pipeline.size(); c++)
       std::cout << "[WS2D] - " << pipeline[c]->getName() << "\n";
   }
-
-  //6. Create custom MPI max (for finding max temperature and positions)
-  MPI_Op_create( (MPI_User_function *)getmaxT, 1, &custom_max );
 }
 
-Simulation::~Simulation()
-{
-  MPI_Op_free( &custom_max );
-}
+Simulation::~Simulation() {}
 
 void Simulation::simulate()
 {
@@ -245,63 +231,44 @@ double Simulation::calcMaxTimestep()
   //1. Find location with maximum temperature
   const std::vector<BlockInfo>& TInfo = sim.T->getBlocksInfo();
   double Tmax = -1;
-  double xmax = -1;
-  double ymax = -1;
-  #pragma omp parallel
+  #pragma omp parallel for reduction(max:Tmax)
+  for (size_t i=0; i < TInfo.size(); i++)
   {
-    double myTmax = -1;
-    double myxmax =  0;
-    double myymax =  0;
-    int myn = 0;
-    #pragma omp for
-    for (size_t i=0; i < TInfo.size(); i++)
+    auto & T  = (*sim.T)(i);
+    for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
+    for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
     {
-      auto & T  = (*sim.T)(i);
-      for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
-      for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
-      {
-        const bool isclose = std::fabs(T(ix,iy).s-myTmax) < eps;
-        if (T(ix,iy).s > myTmax || isclose)
-        {
-          double p[2];
-          TInfo[i].pos(p,ix,iy);
-          if (!isclose)
-          {
-            myxmax = p[0];
-            myymax = p[1];
-            myTmax = T(ix,iy).s;
-            myn = 1;
-          }
-          else
-          {
-            myn ++;
-            myxmax += p[0];
-            myymax += p[1];
-            myTmax = max(T(ix,iy).s,myTmax);
-          }
-        }
-      }
+      Tmax = max(T(ix,iy).s,Tmax);
     }
-    myxmax /= myn;
-    myymax /= myn;
-    #pragma omp critical
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &Tmax, 1, MPI_DOUBLE, MPI_MAX, sim.comm);
+
+
+  double xmax = 0;
+  double ymax = 0;
+  int nnn = 0;
+  #pragma omp parallel for reduction (+:xmax,ymax,nnn)
+  for (size_t i=0; i < TInfo.size(); i++)
+  {
+    auto & T  = (*sim.T)(i);
+    for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
+    for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
     {
-      if (myTmax > Tmax)
+      const bool isclose = std::fabs(T(ix,iy).s-Tmax) < eps;
+      if (isclose)
       {
-        Tmax = myTmax;
-        xmax = myxmax;
-        ymax = myymax;
+        double p[2];
+        TInfo[i].pos(p,ix,iy);
+        nnn ++;
+        xmax += p[0];
+        ymax += p[1];
       }
     }
   }
-
-  double txy[3] = {Tmax,xmax,ymax};
-  MPI_Allreduce(MPI_IN_PLACE, txy, 3, MPI_DOUBLE, custom_max, sim.comm);
-  Tmax = txy[0];
-  xmax = txy[1];
-  ymax = txy[2];
-
-  if (sim.rank == 0) std::cout << "Tmax = " << Tmax << " xmax = " << xmax << " ymax = " << ymax << std::endl;
+  double txy[3] = {xmax,ymax,(double)nnn};
+  MPI_Allreduce(MPI_IN_PLACE, txy, 3, MPI_DOUBLE, MPI_SUM, sim.comm);
+  xmax = txy[0]/txy[2];
+  ymax = txy[1]/txy[2];
 
   //2. Find the location closest to the maximum temperature's location with T=Ttarget
   /*

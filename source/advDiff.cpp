@@ -1,9 +1,3 @@
-//
-//  CubismUP_2D
-//  Copyright (c) 2021 CSE-Lab, ETH Zurich, Switzerland.
-//  Distributed under the terms of the MIT license.
-//
-
 #include "advDiff.h"
 
 using namespace cubism;
@@ -12,10 +6,11 @@ struct KernelAdvectDiffuse
 {
   KernelAdvectDiffuse(const SimulationData & s) : sim(s){}
   const SimulationData & sim;
-  const StencilInfo stencil{-2, -2, 0, 3, 3, 1, true, {0}};
+  const StencilInfo stencil{-2, -2, 0, 3, 3, 1, false, {0}};
   const std::vector<cubism::BlockInfo>& tmpInfo = sim.tmp->getBlocksInfo();
   const int NX = ScalarBlock::sizeX;
   const int NY = ScalarBlock::sizeY;
+  const double c[4] = {2.0/6.0,3.0/6.0,-6.0/6.0,1.0/6.0}; //stencil coefficients for 3rd-order upwind first derivative
 
   void operator()(ScalarLab& T, const BlockInfo& info) const
   {
@@ -25,12 +20,12 @@ struct KernelAdvectDiffuse
     for(int y=0; y<NY; ++y)
     for(int x=0; x<NX; ++x)
     {
-      const double dTdx = sim.ux > 0 ? h*(2*T(x+1,y).s +3*T(x,y).s -6*T(x-1,y).s +T(x-2,y).s)/6.0 : h*(-T(x+2,y).s +6*T(x+1,y).s -3*T(x,y).s -2*T(x-1,y).s)/6.0;
-      const double dTdy = sim.uy > 0 ? h*(2*T(x,y+1).s +3*T(x,y).s -6*T(x,y-1).s +T(x,y-2).s)/6.0 : h*(-T(x,y+2).s +6*T(x,y+1).s -3*T(x,y).s -2*T(x,y-1).s)/6.0;
-
+      const double dTdx = sim.ux > 0 ? h*(c[0]*T(x+1,y).s + c[1]*T(x,y).s + c[2]*T(x-1,y).s + c[3]*T(x-2,y).s) : 
+                                      -h*(c[0]*T(x-1,y).s + c[1]*T(x,y).s + c[2]*T(x+1,y).s + c[3]*T(x+2,y).s);
+      const double dTdy = sim.uy > 0 ? h*(c[0]*T(x,y+1).s + c[1]*T(x,y).s + c[2]*T(x,y-1).s + c[3]*T(x,y-2).s) : 
+                                      -h*(c[0]*T(x,y-1).s + c[1]*T(x,y).s + c[2]*T(x,y+1).s + c[3]*T(x,y+2).s);
       const double dT2dx2 = T(x+1,y).s - 2.0*T(x,y).s + T(x-1,y).s;
       const double dT2dy2 = T(x,y+1).s - 2.0*T(x,y).s + T(x,y-1).s;
-
       TMP(x,y).s = sim.Deffx*dT2dx2+sim.Deffy*dT2dy2-sim.ux*dTdx-sim.uy*dTdy;
     }
 
@@ -44,22 +39,38 @@ struct KernelAdvectDiffuse
     if (faceXm != nullptr)
     {
       const int x = 0;
-      for(int y=0; y<NY; ++y) faceXm[y] = sim.Deffx*(T(x,y) - T(x-1,y));
+      for(int y=0; y<NY; ++y)
+      {
+        faceXm[y] = sim.Deffx*(T(x,y) - T(x-1,y));
+        faceXm[y] -= sim.ux*h/6.0* (sim.ux > 0 ? (2.0*T(x  ,y)+5.0*T(x-1,y)-T(x-2,y)):(-2.0*T(x  ,y)-5.0*T(x+1,y)+T(x+2,y)) );
+      }
     }
     if (faceXp != nullptr)
     {
       const int x = NX-1;
-      for(int y=0; y<NY; ++y) faceXp[y] = sim.Deffx*(T(x,y) - T(x+1,y));
+      for(int y=0; y<NY; ++y)
+      {
+        faceXp[y] = sim.Deffx*(T(x,y) - T(x+1,y));
+        faceXp[y] += sim.ux*h/6.0* (sim.ux > 0 ? (2.0*T(x+1,y)+5.0*T(x  ,y)-T(x-1,y)):(-2.0*T(x-1,y)-5.0*T(x  ,y)+T(x+1,y)) );
+      }
     }
     if (faceYm != nullptr)
     {
       const int y = 0;
-      for(int x=0; x<NX; ++x) faceYm[x] = sim.Deffy*(T(x,y) - T(x,y-1));
+      for(int x=0; x<NX; ++x)
+      {
+        faceYm[x] = sim.Deffy*(T(x,y) - T(x,y-1));
+        faceYm[x] -= sim.uy*h/6.0* (sim.uy > 0 ? (2.0*T(x,y  )+5.0*T(x,y-1)-T(x,y-2)):(-2.0*T(x,y  )-5.0*T(x,y+1)+T(x,y+2)) );
+      }
     }
     if (faceYp != nullptr)
     {
       const int y = NY-1;
-      for(int x=0; x<NX; ++x) faceYp[x] = sim.Deffy*(T(x,y) - T(x,y+1));
+      for(int x=0; x<NX; ++x)
+      {
+        faceYp[x] = sim.Deffy*(T(x,y) - T(x,y+1));
+        faceYp[x] += sim.uy*h/6.0* (sim.uy > 0 ? (2.0*T(x,y+1)+5.0*T(x,y  )-T(x,y-1)):(-2.0*T(x,y-1)-5.0*T(x,y  )+T(x,y+1)) );
+      }
     }
   }
 };
@@ -76,16 +87,16 @@ void advDiff::operator()(const Real dt)
   const int NY = ScalarBlock::sizeY;
   const size_t Nblocks = TInfo.size();
 
-  Trhs.resize(NX*NY*Nblocks);
+  Trhs .resize(NX*NY*Nblocks);
   S1rhs.resize(NX*NY*Nblocks);
   S2rhs.resize(NX*NY*Nblocks);
-
 
   const double Ta = sim.initialConditions.Ta;
   const double C2 = sim.C2;
   const double C3 = sim.C3;
   const double C4 = sim.C4;
 
+#if 0 //Euler timestepping
   KernelAdvectDiffuse K(sim) ;
   cubism::compute<ScalarLab>(K,sim.T,sim.tmp);
   #pragma omp parallel for
@@ -127,6 +138,50 @@ void advDiff::operator()(const Real dt)
       T (ix,iy).s += dt* Trhs[idx];
       S1(ix,iy).s += dt*S1rhs[idx];
       S2(ix,iy).s += dt*S2rhs[idx];
+    }
+  }
+#endif
+
+  //Low-storage 3rd-order Runge Kutta
+  KernelAdvectDiffuse K(sim);
+  const Real alpha[3] = { 1.0/3.0,  15.0/ 16.0,8.0/15.0};
+  const Real  beta[3] = {-5.0/9.0,-153.0/128.0,0.0     };
+  std::fill(Trhs .begin(), Trhs .end(), 0.0);
+  std::fill(S1rhs.begin(), S1rhs.end(), 0.0);
+  std::fill(S2rhs.begin(), S2rhs.end(), 0.0);
+  for (int RKstep = 0; RKstep < 3; RKstep ++)
+  {
+    cubism::compute<ScalarLab>(K,sim.T,sim.tmp); //Store dt*RHS(u) to tmpV
+    #pragma omp parallel for
+    for (size_t i=0; i < Nblocks; i++)
+    {
+      ScalarBlock & __restrict__ T   = *(ScalarBlock*)   TInfo[i].ptrBlock;
+      ScalarBlock & __restrict__ S1  = *(ScalarBlock*)  S1Info[i].ptrBlock;
+      ScalarBlock & __restrict__ S2  = *(ScalarBlock*)  S2Info[i].ptrBlock;
+      ScalarBlock & __restrict__ TMP = *(ScalarBlock*) tmpInfo[i].ptrBlock;
+      const double ih2 = 1.0/(TInfo[i].h*TInfo[i].h);
+      for(int iy=0; iy<NY; ++iy)
+      for(int ix=0; ix<NX; ++ix)
+      {
+        const int idx = i*NX*NY + iy*NX + ix;
+        const double AdvectionDiffusion = ih2 * TMP(ix,iy).s;
+        const double S = S1(ix,iy).s + S2(ix,iy).s;
+        const double C0inv = 1.0/(sim.a*S + (1.0-sim.a)*sim.lambda*sim.gamma + sim.a*sim.gamma*(1.0-S));
+        const double C1 = 1/C0inv - sim.a*S;
+        const double r1 = sim.cs1 * exp(-sim.b1/T(ix,iy).s);
+        const double r2 = sim.cs2 * exp(-sim.b2/T(ix,iy).s);
+        const double r2t = sim.rm*r2/(sim.rm+r2);
+        const double C4U = C4*(sim.Anc*pow(T(ix,iy).s-Ta,1.0/3.0) + sim.epsilon*sim.sigmab*(T(ix,iy).s*T(ix,iy).s+Ta*Ta)*(T(ix,iy).s+Ta));
+        Trhs [idx] += dt*(C1*AdvectionDiffusion - C2*S1(ix,iy).s*r1 + C3*S2(ix,iy).s*r2t - C4U*(T(ix,iy).s-Ta) )*C0inv;
+        S1rhs[idx] += -dt*S1(ix,iy).s*r1;
+        S2rhs[idx] += -dt*S2(ix,iy).s*r2t;
+        T (ix,iy).s += Trhs [idx]*alpha[RKstep];
+        S1(ix,iy).s += S1rhs[idx]*alpha[RKstep];
+        S2(ix,iy).s += S2rhs[idx]*alpha[RKstep];
+        Trhs [idx] *= beta[RKstep];
+        S1rhs[idx] *= beta[RKstep];
+        S2rhs[idx] *= beta[RKstep];
+      }
     }
   }
 

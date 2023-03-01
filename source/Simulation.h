@@ -16,5 +16,4 @@ class Simulation
  protected:
   cubism::ArgumentParser parser;
   double calcMaxTimestep();
-  MPI_Op custom_max;
 };
