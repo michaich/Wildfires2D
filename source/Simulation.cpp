@@ -139,16 +139,22 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
   if(sim.verbose) std::cout << "[WS2D] Allocating Grid..." << std::endl;
   sim.allocateGrid();
 
-  //4. Impose initial conditions
-  if(sim.verbose) std::cout << "[WS2D] Imposing Initial Conditions..." << std::endl;
-  IC ic(sim);
-  ic(0);
-
-  //5. Create compute pipeline
+  //4. Create compute pipeline
   if(sim.verbose)
     std::cout << "[WS2D] Creating Computational Pipeline..." << std::endl;
   pipeline.push_back(std::make_shared<AdaptTheMesh>(sim));
   pipeline.push_back(std::make_shared<advDiff>(sim));
+
+  //5. Impose initial conditions and initial grid refinement
+  if(sim.verbose) std::cout << "[WS2D] Imposing Initial Conditions..." << std::endl;
+  IC ic(sim);
+  ic(0);
+  for (int i = 0 ; i < sim.levelMax; i++)
+  {
+    (*pipeline[0])(0);
+    ic(0);
+  }
+
   if(sim.verbose)
   {
     std::cout << "[WS2D] Operator ordering:\n";
@@ -233,8 +239,8 @@ double Simulation::calcMaxTimestep()
   const double uMax = sqrt(sim.ux*sim.ux+sim.uy*sim.uy);
   const double dtAdvection = sim.CFL * h / ( uMax + 1e-8 ); //assuming C1/C0 = 1
 
-
   //First, compute current dispersion coefficients
+  double eps     = 1.0;
 
   //1. Find location with maximum temperature
   const std::vector<BlockInfo>& TInfo = sim.T->getBlocksInfo();
@@ -246,6 +252,7 @@ double Simulation::calcMaxTimestep()
     double myTmax = -1;
     double myxmax =  0;
     double myymax =  0;
+    int myn = 0;
     #pragma omp for
     for (size_t i=0; i < TInfo.size(); i++)
     {
@@ -253,16 +260,30 @@ double Simulation::calcMaxTimestep()
       for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
       for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
       {
-        if (T(ix,iy).s > myTmax)
+        const bool isclose = std::fabs(T(ix,iy).s-myTmax) < eps;
+        if (T(ix,iy).s > myTmax || isclose)
         {
           double p[2];
           TInfo[i].pos(p,ix,iy);
-          myxmax = p[0];
-          myymax = p[1];
-          myTmax = T(ix,iy).s;
+          if (!isclose)
+          {
+            myxmax = p[0];
+            myymax = p[1];
+            myTmax = T(ix,iy).s;
+            myn = 1;
+          }
+          else
+          {
+            myn ++;
+            myxmax += p[0];
+            myymax += p[1];
+            myTmax = max(T(ix,iy).s,myTmax);
+          }
         }
       }
     }
+    myxmax /= myn;
+    myymax /= myn;
     #pragma omp critical
     {
       if (myTmax > Tmax)
@@ -273,11 +294,14 @@ double Simulation::calcMaxTimestep()
       }
     }
   }
+
   double txy[3] = {Tmax,xmax,ymax};
   MPI_Allreduce(MPI_IN_PLACE, txy, 3, MPI_DOUBLE, custom_max, sim.comm);
   Tmax = txy[0];
   xmax = txy[1];
   ymax = txy[2];
+
+  if (sim.rank == 0) std::cout << "Tmax = " << Tmax << " xmax = " << xmax << " ymax = " << ymax << std::endl;
 
   //2. Find the location closest to the maximum temperature's location with T=Ttarget
   /*
@@ -289,11 +313,12 @@ double Simulation::calcMaxTimestep()
   double Ttarget = 0.1*Tmax + sim.initialConditions.Ta;
   double deltaTx = 1e10;
   double deltaTy = 1e10;
-  double eps     = 1.0;
   double dxmin   = 1e10;
   double dymin   = 1e10;
   double xtarget = 1e10;
   double ytarget = 1e10;
+  const int signx = sim.ux > 0 ? 1:-1;
+  const int signy = sim.uy > 0 ? 1:-1;
   #pragma omp parallel
   {
     double mydeltaTx = 1e10;
@@ -311,20 +336,20 @@ double Simulation::calcMaxTimestep()
       {
         double p[2];
         TInfo[i].pos(p,ix,iy);
-        const double dx = std::fabs(p[0]-xmax);
-        const double dy = std::fabs(p[1]-ymax);
+        const double dx = signx*(p[0]-xmax) > 0 ? std::fabs(p[0]-xmax) : 1e10;
+        const double dy = signy*(p[1]-ymax) > 0 ? std::fabs(p[1]-ymax) : 1e10;
         const double dT = std::fabs(T(ix,iy).s-Ttarget);
 
-        if ( (dT < eps || dT < mydeltaTx) && (dx < mydxmin) )
+        if ( (std::fabs(mydeltaTx-dT) < eps || dT < mydeltaTx) && dx < mydxmin )
         {
           mydxmin = dx;
-          mydeltaTx = dT;
+          mydeltaTx = min(dT,mydeltaTx);
           myxtarget = p[0];
         }
-        if ( (dT < eps || dT < mydeltaTy) && (dy < mydymin) )
+        if ( (std::fabs(mydeltaTy-dT) < eps || dT < mydeltaTy) && dy < mydymin )
         {
           mydymin = dy;
-          mydeltaTy = dT;
+          mydeltaTy = min(dT,mydeltaTy);
           myytarget = p[1];
         }
       }
@@ -332,13 +357,13 @@ double Simulation::calcMaxTimestep()
 
     #pragma omp critical
     {
-      if ( (mydeltaTx < eps || mydeltaTx < deltaTx) && (mydxmin < dxmin) )
+      if ( ( mydeltaTx < deltaTx) && (mydxmin < dxmin) )
       {
         dxmin = mydxmin;
         deltaTx = mydeltaTx;
         xtarget = myxtarget;
       }
-      if ( (mydeltaTy < eps || mydeltaTy < deltaTy) && (mydymin < dymin) )
+      if ( (mydeltaTy < deltaTy) && (mydymin < dymin) )
       {
         dymin = mydymin;
         deltaTy = mydeltaTy;
@@ -356,14 +381,12 @@ double Simulation::calcMaxTimestep()
 
   if (sim.verbose) std::cout << "   characteristic fire lengths:" << Lcx << "," << Lcy << std::endl;
 
-  double Lcx = 10.0;
-  double Lcy = 10.0;
-
   sim.Deffx = sim.Dbuoyx + sim.Ad * sim.ux * Lcx;
   sim.Deffy = sim.Dbuoyy + sim.Ad * sim.uy * Lcy;
 
   const double dtDiffusion = 0.25*h*h/(sim.Deffx+sim.Deffy+0.25*h*uMax);
   sim.dt = std::min({ dtDiffusion, dtAdvection});
+  if (sim.rank == 0) std::cout << "dtDiffusion=" << dtDiffusion << " dtAdvection = " << dtAdvection << std::endl; 
 
   return sim.dt;
 }

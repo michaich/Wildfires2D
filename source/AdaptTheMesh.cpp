@@ -40,7 +40,7 @@ using namespace cubism;
 
 void AdaptTheMesh::operator()(const Real dt)
 {  
-  if (sim.step > 10 && sim.step % sim.AdaptSteps != 0) return;
+  if (sim.step % sim.AdaptSteps != 0) return;
 
   sim.startProfiler("AdaptTheMesh");
 
