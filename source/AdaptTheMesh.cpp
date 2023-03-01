@@ -1,9 +1,3 @@
-//
-//  CubismUP_2D
-//  Copyright (c) 2021 CSE-Lab, ETH Zurich, Switzerland.
-//  Distributed under the terms of the MIT license.
-//
-
 #include "AdaptTheMesh.h"
 #include "Helpers.h"
 #include <Cubism/AMR_MeshAdaptation.h>
@@ -58,10 +52,12 @@ void AdaptTheMesh::operator()(const Real dt)
   T_amr ->Tag();
   S1_amr->TagLike(TInfo);
   S2_amr->TagLike(TInfo);
+  tmp_amr->TagLike(TInfo);
 
   T_amr ->Adapt(sim.time, sim.verbose, false);
   S1_amr->Adapt(sim.time, false      , false);
   S2_amr->Adapt(sim.time, false      , false);
+  tmp_amr->Adapt(sim.time, false     , true);
 
   sim.stopProfiler();
 }

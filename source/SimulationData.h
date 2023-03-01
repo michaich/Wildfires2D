@@ -67,6 +67,7 @@ struct SimulationData
   ScalarGrid * T  = nullptr; //temperature
   ScalarGrid * S1 = nullptr; //endothermic fuel mass fraction
   ScalarGrid * S2 = nullptr; //exothermic fuel mass fraction
+  ScalarGrid * tmp = nullptr; //auxiliary temporary grid
 
   // parameters/constants of the model
   double a;

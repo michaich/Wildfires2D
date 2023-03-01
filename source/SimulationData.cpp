@@ -16,6 +16,7 @@ void SimulationData::allocateGrid()
   T   = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
   S1  = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
   S2  = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
+  tmp = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
 
   const std::vector<BlockInfo>& TInfo = T->getBlocksInfo();
 

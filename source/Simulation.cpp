@@ -4,15 +4,12 @@
 #include "Helpers.h"
 #include "advDiff.h"
 #include "AdaptTheMesh.h"
-#include "BufferedLogger.h"
 #include <algorithm>
 #include <iterator>
 
 using namespace cubism;
 
-static const char kHorLine[] = "================================================================\n";
-
-static void getmaxT(double * invec, double * inoutvec, double *len, MPI_Datatype *dtype)
+static void getmaxT(double * invec, double * inoutvec, int *len, MPI_Datatype *dtype)
 {
   if (invec[0] > inoutvec[0])
   {
@@ -62,10 +59,10 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.levelStart = parser("-levelStart").asInt(sim.levelMax - 1); //initial level of refinement
     sim.extent     = parser("-extent"    ).asDouble(1000)         ; //simulation extent
     sim.CFL        = parser("-CFL"       ).asDouble(0.5)          ; //CFL number
-    sim.endTime    = parser("-tend"      ).asDouble(10.)          ; //simulation ends at t=tend (inactive if tend=0)
+    sim.endTime    = parser("-tend"      ).asDouble(10000. )      ; //simulation ends at t=tend (inactive if tend=0)
   
     // output parameters
-    sim.dumpTime           = parser("-tdump"        ).asDouble(0.1);
+    sim.dumpTime           = parser("-tdump"        ).asDouble(10.);
     sim.path4serialization = parser("-serialization").asString("./");
     sim.verbose            = parser("-verbose"      ).asInt(1);
     sim.verbose = sim.verbose && sim.rank == 0;
@@ -159,7 +156,6 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
       std::cout << "[WS2D] - " << pipeline[c]->getName() << "\n";
   }
 
-
   //6. Create custom MPI max (for finding max temperature and positions)
   MPI_Op_create( (MPI_User_function *)getmaxT, 1, &custom_max );
 }
@@ -171,7 +167,7 @@ Simulation::~Simulation()
 
 void Simulation::simulate()
 {
-  if (sim.verbose) std::cout << kHorLine << "[WS2D] Starting Simulation..." << std::endl;
+  if (sim.verbose) std::cout << "[WS2D] Starting Simulation..." << std::endl;
 
   //Loop where timesteps are performed, until termination
   while (1)
@@ -181,10 +177,7 @@ void Simulation::simulate()
 
     //2. Print some information on screen
     if (sim.verbose)
-    {
-      std::cout << kHorLine;
-      printf("[WS2D] step:%d, blocks:%zu, time:%f",sim.step,sim.T->getBlocksInfo().size(),sim.time);
-    }
+      printf("[WS2D] step:%d, blocks per rank:%zu, time:%f dt:%f\n",sim.step,sim.T->getBlocksInfo().size(),sim.time,sim.dt);
          
     //3. Save fields, if needed
     if( sim.bDump() )
@@ -198,8 +191,6 @@ void Simulation::simulate()
     //4. Execute the operators that make up one timestep
     for (size_t c=0; c<pipeline.size(); c++)
     {
-      if(sim.verbose)
-        std::cout << "[WS2D] running " << pipeline[c]->getName() << "...\n";
       (*pipeline[c])(dt);
     }
     sim.time += dt;
@@ -231,9 +222,8 @@ void Simulation::simulate()
 
   if (sim.verbose)
   {
-    std::cout << kHorLine << "[WS2D] Simulation Over... Profiling information:\n";
+    std::cout << "[WS2D] Simulation Over... Profiling information:\n";
     sim.printResetProfiler();
-    std::cout << kHorLine;
   }
 }
 
@@ -288,8 +278,6 @@ double Simulation::calcMaxTimestep()
   Tmax = txy[0];
   xmax = txy[1];
   ymax = txy[2];
-
-
 
   //2. Find the location closest to the maximum temperature's location with T=Ttarget
   /*
@@ -368,8 +356,11 @@ double Simulation::calcMaxTimestep()
 
   if (sim.verbose) std::cout << "   characteristic fire lengths:" << Lcx << "," << Lcy << std::endl;
 
+  double Lcx = 10.0;
+  double Lcy = 10.0;
+
   sim.Deffx = sim.Dbuoyx + sim.Ad * sim.ux * Lcx;
-  sim.Deffy = sim.Dbuoyy + sim.Ad * sim.uy * Lcx;
+  sim.Deffy = sim.Dbuoyy + sim.Ad * sim.uy * Lcy;
 
   const double dtDiffusion = 0.25*h*h/(sim.Deffx+sim.Deffy+0.25*h*uMax);
   sim.dt = std::min({ dtDiffusion, dtAdvection});
