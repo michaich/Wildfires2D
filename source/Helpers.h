@@ -1,9 +1,3 @@
-//
-//  CubismUP_2D
-//  Copyright (c) 2021 CSE-Lab, ETH Zurich, Switzerland.
-//  Distributed under the terms of the MIT license.
-//
-
 #pragma once
 
 #include <unordered_map>
@@ -11,6 +5,7 @@
 #include "Operator.h"
 #include "Cubism/FluxCorrection.h"
 
+//class used to set the initial conditions
 class IC : public Operator
 {
   public:

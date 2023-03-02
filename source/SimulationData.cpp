@@ -42,9 +42,10 @@ SimulationData::SimulationData() = default;
 SimulationData::~SimulationData()
 {
   delete profiler;
-  if(T  not_eq nullptr) delete T ;
-  if(S1 not_eq nullptr) delete S1;
-  if(S2 not_eq nullptr) delete S2;
+  if(T   not_eq nullptr) delete T ;
+  if(S1  not_eq nullptr) delete S1;
+  if(S2  not_eq nullptr) delete S2;
+  if(tmp not_eq nullptr) delete tmp;
 }
 
 bool SimulationData::bOver() const

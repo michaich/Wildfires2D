@@ -1,5 +1,4 @@
 #include "Simulation.h"
-
 #include <Cubism/HDF5Dumper.h>
 #include "Helpers.h"
 #include "advDiff.h"
@@ -14,11 +13,11 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
   //1. Print initial general information
   {
     sim.comm = comm;
-    int size;
-    MPI_Comm_size(sim.comm,&size);
     MPI_Comm_rank(sim.comm,&sim.rank);
     if (sim.rank == 0)
     {
+      int size;
+      MPI_Comm_size(sim.comm,&size);
       std::cout <<"==========================\n";
       std::cout <<"    Wildfire spread 2D    \n";
       std::cout <<"==========================\n";
@@ -104,24 +103,20 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.lambda = sim.rhog/sim.rhos;
 
     // (constant) velocity field, derived from all parameters above
-    const double z0 = sim.velocityField.z0;
-    const double kappa = sim.velocityField.kappa;
-    const double u10x = sim.velocityField.u10x;
-    const double u10y = sim.velocityField.u10y;
+    const double z0     = sim.velocityField.z0;
+    const double kappa  = sim.velocityField.kappa;
+    const double u10x   = sim.velocityField.u10x;
+    const double u10y   = sim.velocityField.u10y;
     const double lambda = sim.velocityField.lambda;
-    const double alpha = sim.velocityField.alpha;
-    const double H = sim.H;
-
-    const double dx = (H - z0) - lambda*u10x;
-    const double dy = (H - z0) - lambda*u10y;
-
+    const double alpha  = sim.velocityField.alpha;
+    const double H      = sim.H;
+    const double dx     = (H - z0) - lambda*u10x;
+    const double dy     = (H - z0) - lambda*u10y;
     const double uxstar = u10x * kappa / log((10-dx)/z0);
     const double uystar = u10y * kappa / log((10-dy)/z0);
-
-    const double uhx = uxstar/kappa*log((H-dx)/z0);
-    const double uhy = uystar/kappa*log((H-dy)/z0);
-
-    const double coef = (1.0-exp(-alpha)) / alpha; 
+    const double uhx    = uxstar/kappa*log((H-dx)/z0);
+    const double uhy    = uystar/kappa*log((H-dy)/z0);
+    const double coef   = (1.0-exp(-alpha)) / alpha; 
     sim.ux = uhx*coef;
     sim.uy = uhy*coef;
     if (sim.verbose) std::cout << "[WS2D] Velocity Field: ux = " << sim.ux << " uy = " << sim.uy << std::endl;
@@ -132,8 +127,7 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
   sim.allocateGrid();
 
   //4. Create compute pipeline
-  if(sim.verbose)
-    std::cout << "[WS2D] Creating Computational Pipeline..." << std::endl;
+  if(sim.verbose) std::cout << "[WS2D] Creating Computational Pipeline..." << std::endl;
   pipeline.push_back(std::make_shared<AdaptTheMesh>(sim));
   pipeline.push_back(std::make_shared<advDiff>(sim));
 
@@ -168,26 +162,22 @@ void Simulation::simulate()
     const double dt = calcMaxTimestep();
 
     //2. Print some information on screen
-    if (sim.verbose)
-      printf("[WS2D] step:%d, blocks per rank:%zu, time:%f dt:%f\n",sim.step,sim.T->getBlocksInfo().size(),sim.time,sim.dt);
+    if (sim.verbose) printf("[WS2D] step:%d, blocks per rank:%zu, time:%f dt:%f\n",sim.step,sim.T->getBlocksInfo().size(),sim.time,sim.dt);
          
     //3. Save fields, if needed
     if( sim.bDump() )
     {
-      if(sim.verbose)
-        std::cout << "[WS2D] dumping fields...\n";
+      if(sim.verbose) std::cout << "[WS2D] dumping fields...\n";
       sim.nextDumpTime += sim.dumpTime;
       sim.dumpAll("wildfires_");
     }
 
     //4. Execute the operators that make up one timestep
-    for (size_t c=0; c<pipeline.size(); c++)
-    {
-      (*pipeline[c])(dt);
-    }
+    for (size_t c=0; c<pipeline.size(); c++) (*pipeline[c])(dt);
     sim.time += dt;
     sim.step++;
 
+    //5. Save some quantities of interest (if any)
     if(sim.rank == 0)
     {
       std::stringstream ssF;
@@ -198,13 +188,12 @@ void Simulation::simulate()
       fout<<sim.time<<" "<<sim.dt<<" \n";
     }
 
-    //5. Check if simulation should terminate
+    //6. Check if simulation should terminate
     if (sim.bOver())
     {
       if( sim.bDump() )
       {
-        if(sim.verbose)
-          std::cout << "[WS2D] dumping fields...\n";
+        if(sim.verbose) std::cout << "[WS2D] dumping fields...\n";
         sim.nextDumpTime += sim.dumpTime;
         sim.dumpAll("wildfires_");
       }
@@ -221,14 +210,15 @@ void Simulation::simulate()
 
 double Simulation::calcMaxTimestep()
 {
+  const double eps = 1.0;
   const double h = sim.getH();
   const double uMax = sqrt(sim.ux*sim.ux+sim.uy*sim.uy);
   const double dtAdvection = sim.CFL * h / ( uMax + 1e-8 ); //assuming C1/C0 = 1
 
-  //First, compute current dispersion coefficients
-  double eps     = 1.0;
+  //To compute the current maximum timestep, we first need to find the dispersion coefficients.
+  //This is done in the steps outlined below.
 
-  //1. Find location with maximum temperature
+  //1. Find maximum temperature
   const std::vector<BlockInfo>& TInfo = sim.T->getBlocksInfo();
   double Tmax = -1;
   #pragma omp parallel for reduction(max:Tmax)
@@ -243,7 +233,10 @@ double Simulation::calcMaxTimestep()
   }
   MPI_Allreduce(MPI_IN_PLACE, &Tmax, 1, MPI_DOUBLE, MPI_MAX, sim.comm);
 
-
+  //2. Find all N locations (xi,yi) with temperature T(xi,yi) close to Tmax : |T(xi,yi)-Tmax| < eps.
+  //   Then average all N points to get location of Tmax: 
+  //   xmax = sum(i=1,...,N) xi/N
+  //   ymax = sum(i=1,...,N) yi/N
   double xmax = 0;
   double ymax = 0;
   int nnn = 0;
@@ -270,7 +263,7 @@ double Simulation::calcMaxTimestep()
   xmax = txy[0]/txy[2];
   ymax = txy[1]/txy[2];
 
-  //2. Find the location closest to the maximum temperature's location with T=Ttarget
+  //3. Find the location closest to the maximum temperature's location with T=Ttarget
   /*
      To do so, we look for all locations with |T(x,y)-Ttarget| < eps (we arbitrarily set eps=1.0)
      If we only find one location, we keep that.
@@ -321,7 +314,6 @@ double Simulation::calcMaxTimestep()
         }
       }
     }
-
     #pragma omp critical
     {
       if ( ( mydeltaTx < deltaTx) && (mydxmin < dxmin) )
@@ -351,9 +343,11 @@ double Simulation::calcMaxTimestep()
   sim.Deffx = sim.Dbuoyx + sim.Ad * sim.ux * Lcx;
   sim.Deffy = sim.Dbuoyy + sim.Ad * sim.uy * Lcy;
 
+  
+  //Now that we found the dispersion coefficients we can compute the maximum allowed timestep
   const double dtDiffusion = 0.25*h*h/(sim.Deffx+sim.Deffy+0.25*h*uMax);
   sim.dt = std::min({ dtDiffusion, dtAdvection});
-  if (sim.rank == 0) std::cout << "dtDiffusion=" << dtDiffusion << " dtAdvection = " << dtAdvection << std::endl; 
+  if (sim.verbose == 0) std::cout << "dtDiffusion=" << dtDiffusion << " dtAdvection = " << dtAdvection << std::endl; 
 
   return sim.dt;
 }

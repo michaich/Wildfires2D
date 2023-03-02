@@ -39,7 +39,7 @@ using namespace cubism;
 
 
 void AdaptTheMesh::operator()(const Real dt)
-{  
+{
   if (sim.step % sim.AdaptSteps != 0) return;
 
   sim.startProfiler("AdaptTheMesh");
@@ -49,15 +49,19 @@ void AdaptTheMesh::operator()(const Real dt)
   //GradT K(sim);
   //cubism::compute<ScalarLab>(K,sim.T);
 
-  T_amr ->Tag();
-  S1_amr->TagLike(TInfo);
-  S2_amr->TagLike(TInfo);
+  //We tag (mark) blocks of the grid for refinement/compression based on the magnitude of T(t,x,y)
+  T_amr  ->Tag();
+
+  //The other fields (S1,S2 and temporary) are marked according to T(t,x,y)
+  S1_amr ->TagLike(TInfo);
+  S2_amr ->TagLike(TInfo);
   tmp_amr->TagLike(TInfo);
 
-  T_amr ->Adapt(sim.time, sim.verbose, false);
-  S1_amr->Adapt(sim.time, false      , false);
-  S2_amr->Adapt(sim.time, false      , false);
-  tmp_amr->Adapt(sim.time, false     , true);
+  //Do the refinement/compression. Print output only for temperature (if sim.verbose = true).
+  T_amr  ->Adapt(sim.time, sim.verbose,false); // last flag set to false means we interpolate values when refining
+  S1_amr ->Adapt(sim.time, false      ,false); // last flag set to false means we interpolate values when refining
+  S2_amr ->Adapt(sim.time, false      ,false); // last flag set to false means we interpolate values when refining
+  tmp_amr->Adapt(sim.time, false      ,true ); // last flag set to true  means we do not interpolate values when refining
 
   sim.stopProfiler();
 }

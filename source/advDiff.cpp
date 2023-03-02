@@ -91,12 +91,23 @@ void advDiff::operator()(const Real dt)
   S1rhs.resize(NX*NY*Nblocks);
   S2rhs.resize(NX*NY*Nblocks);
 
-  const double Ta = sim.initialConditions.Ta;
-  const double C2 = sim.C2;
-  const double C3 = sim.C3;
-  const double C4 = sim.C4;
+  const double Ta      = sim.initialConditions.Ta;
+  const double C2      = sim.C2;
+  const double C3      = sim.C3;
+  const double C4      = sim.C4;
+  const double b1      = sim.b1;
+  const double b2      = sim.b2;
+  const double rm      = sim.rm;
+  const double a       = sim.a;
+  const double cs1     = sim.cs1;
+  const double cs2     = sim.cs2;
+  const double Anc     = sim.Anc;
+  const double epsilon = sim.epsilon;
+  const double sigmab  = sim.sigmab;
+  const double gamma   = sim.gamma;
+  const double lambda  = sim.lambda;
 
-#if 0 //Euler timestepping
+  #if 0 //Euler timestepping
   KernelAdvectDiffuse K(sim) ;
   cubism::compute<ScalarLab>(K,sim.T,sim.tmp);
   #pragma omp parallel for
@@ -140,18 +151,29 @@ void advDiff::operator()(const Real dt)
       S2(ix,iy).s += dt*S2rhs[idx];
     }
   }
-#endif
+  #endif
 
-  //Low-storage 3rd-order Runge Kutta
-  KernelAdvectDiffuse K(sim);
+  //Low-storage 3rd-order Runge Kutta time integration
+
+  //RK3 coefficients
   const Real alpha[3] = { 1.0/3.0,  15.0/ 16.0,8.0/15.0};
   const Real  beta[3] = {-5.0/9.0,-153.0/128.0,0.0     };
+
+  //We need a right-hand-side (RHS) vector for each field, to perform RK3
   std::fill(Trhs .begin(), Trhs .end(), 0.0);
   std::fill(S1rhs.begin(), S1rhs.end(), 0.0);
   std::fill(S2rhs.begin(), S2rhs.end(), 0.0);
+
+  //This struct will compute the advection and diffusion terms that use a stencil for the derivatives
+  KernelAdvectDiffuse K(sim);
+
+  //Perform the three RK steps
   for (int RKstep = 0; RKstep < 3; RKstep ++)
   {
-    cubism::compute<ScalarLab>(K,sim.T,sim.tmp); //Store dt*RHS(u) to tmpV
+    //Compute advection+diffusion terms and store result to grid 'tmp'
+    cubism::compute<ScalarLab>(K,sim.T,sim.tmp);
+
+    //Loop over all gridpoints and compute the RHS of the PDEs we are solving
     #pragma omp parallel for
     for (size_t i=0; i < Nblocks; i++)
     {
@@ -163,18 +185,27 @@ void advDiff::operator()(const Real dt)
       for(int iy=0; iy<NY; ++iy)
       for(int ix=0; ix<NX; ++ix)
       {
+        //match grid point 'idx' with grid point (ix,iy) from block i
         const int idx = i*NX*NY + iy*NX + ix;
+
+        //advection+diffusion terms computed from before
         const double AdvectionDiffusion = ih2 * TMP(ix,iy).s;
-        const double S = S1(ix,iy).s + S2(ix,iy).s;
-        const double C0inv = 1.0/(sim.a*S + (1.0-sim.a)*sim.lambda*sim.gamma + sim.a*sim.gamma*(1.0-S));
-        const double C1 = 1/C0inv - sim.a*S;
-        const double r1 = sim.cs1 * exp(-sim.b1/T(ix,iy).s);
-        const double r2 = sim.cs2 * exp(-sim.b2/T(ix,iy).s);
-        const double r2t = sim.rm*r2/(sim.rm+r2);
-        const double C4U = C4*(sim.Anc*pow(T(ix,iy).s-Ta,1.0/3.0) + sim.epsilon*sim.sigmab*(T(ix,iy).s*T(ix,iy).s+Ta*Ta)*(T(ix,iy).s+Ta));
-        Trhs [idx] += dt*(C1*AdvectionDiffusion - C2*S1(ix,iy).s*r1 + C3*S2(ix,iy).s*r2t - C4U*(T(ix,iy).s-Ta) )*C0inv;
+
+        //auxiliary quantities needed for right-hand sides
+        const double S     = S1(ix,iy).s + S2(ix,iy).s;
+        const double C0inv = 1.0/(a*S + (1.0-a)*lambda*gamma + a*gamma*(1.0-S));
+        const double C1    = 1.0/C0inv - a*S;
+        const double r1    = cs1 * exp(-b1/T(ix,iy).s);
+        const double r2    = cs2 * exp(-b2/T(ix,iy).s);
+        const double r2t   = rm*r2/(rm+r2);
+        const double C4U   = C4*(Anc*pow(T(ix,iy).s-Ta,1.0/3.0) + epsilon*sigmab*(T(ix,iy).s*T(ix,iy).s+Ta*Ta)*(T(ix,iy).s+Ta));
+
+        //right-hand sides
+        Trhs [idx] += dt*(C1*AdvectionDiffusion - C2*r1*S1(ix,iy).s + C3*r2t*S2(ix,iy).s - C4U*(T(ix,iy).s-Ta))*C0inv;
         S1rhs[idx] += -dt*S1(ix,iy).s*r1;
         S2rhs[idx] += -dt*S2(ix,iy).s*r2t;
+
+        //perform RK step here
         T (ix,iy).s += Trhs [idx]*alpha[RKstep];
         S1(ix,iy).s += S1rhs[idx]*alpha[RKstep];
         S2(ix,iy).s += S2rhs[idx]*alpha[RKstep];
