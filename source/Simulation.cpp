@@ -95,6 +95,13 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.velocityField.u10x   = parser("-u10x"  ).asDouble(5);
     sim.velocityField.u10y   = parser("-u10y"  ).asDouble(5);
 
+    // fuel initial conditions
+    sim.S1min = parser("-S1min").asDouble(0.15);
+    sim.S2min = parser("-S2min").asDouble(0.85);
+    sim.S1max = parser("-S1max").asDouble(sim.S1min);
+    sim.S2max = parser("-S2max").asDouble(sim.S2min);
+    sim.ic_seed = parser("-ic_seed").asInt(0);
+
     // constants that depend on the above parameters
     sim.C2 = sim.a*sim.A1/sim.cps;
     sim.C3 = sim.a*sim.A2/sim.cps;

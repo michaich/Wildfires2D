@@ -14,26 +14,34 @@ void IC::operator()(const double dt)
   const double xside = sim.initialConditions.xside;
   const double yside = sim.initialConditions.yside;
 
-  #pragma omp parallel for
-  for (size_t i=0; i < TInfo.size(); i++)
+  #pragma omp parallel
   {
-    auto & T  = (*sim.T)(i);
-    auto & S1 = (*sim.S1)(i);
-    auto & S2 = (*sim.S2)(i);
-    for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
-    for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
+    const int tid = omp_get_thread_num();
+    std::default_random_engine generator (sim.ic_seed + tid);
+    std::uniform_real_distribution<double> distributionS1 (sim.S1min,sim.S1max);
+    std::uniform_real_distribution<double> distributionS2 (sim.S2min,sim.S2max);
+    #pragma omp for
+    for (size_t i=0; i < TInfo.size(); i++)
     {
-      double p[2];
-      TInfo[i].pos(p,ix,iy);
-      S1(ix,iy).s = .15;
-      S2(ix,iy).s = .85;
-      if ( std::fabs(p[0]-xcenter) < 0.5*xside && std::fabs(p[1]-ycenter) < 0.5*yside)
+  
+      auto & T  = (*sim.T)(i);
+      auto & S1 = (*sim.S1)(i);
+      auto & S2 = (*sim.S2)(i);
+      for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
+      for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
       {
-        T(ix,iy).s = Ti;
-      }
-      else
-      {
-        T(ix,iy).s = Ta;
+        double p[2];
+        TInfo[i].pos(p,ix,iy);
+        S1(ix,iy).s = distributionS1(generator);
+        S2(ix,iy).s = distributionS2(generator);
+        if ( std::fabs(p[0]-xcenter) < 0.5*xside && std::fabs(p[1]-ycenter) < 0.5*yside)
+        {
+          T(ix,iy).s = Ti;
+        }
+        else
+        {
+          T(ix,iy).s = Ta;
+        }
       }
     }
   }

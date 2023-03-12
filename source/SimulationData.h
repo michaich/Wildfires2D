@@ -131,6 +131,10 @@ struct SimulationData
   double Lcx;
   double Lcy;
 
+  // endothermic and exothermic initial condition bounds
+  int ic_seed;
+  double S1min,S1max;
+  double S2min,S2max;
 
   void allocateGrid();                  // called when simulation starts, to allocate the gridds
   bool bDump();                         // check if dumping of fields is needed at the current time
