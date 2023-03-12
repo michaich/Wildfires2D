@@ -7,12 +7,7 @@ void IC::operator()(const double dt)
 {
   const std::vector<BlockInfo>& TInfo = sim.T->getBlocksInfo();
 
-  const double Ti = sim.initialConditions.Ti;
   const double Ta = sim.initialConditions.Ta;
-  const double xcenter = sim.initialConditions.xcenter;
-  const double ycenter = sim.initialConditions.ycenter;
-  const double xside = sim.initialConditions.xside;
-  const double yside = sim.initialConditions.yside;
 
   #pragma omp parallel
   {
@@ -30,17 +25,42 @@ void IC::operator()(const double dt)
       for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
       for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
       {
-        double p[2];
-        TInfo[i].pos(p,ix,iy);
         S1(ix,iy).s = distributionS1(generator);
         S2(ix,iy).s = distributionS2(generator);
-        if ( std::fabs(p[0]-xcenter) < 0.5*xside && std::fabs(p[1]-ycenter) < 0.5*yside)
+        T(ix,iy).s = Ta;
+
+
+        double p[2];
+        TInfo[i].pos(p,ix,iy);
+        const double x = p[0];
+        const double y = p[1];
+
+        //check if we are in a road or an ingition zone
+        for (int n = 0; n < sim.initialConditions.number_of_zones; n++)
         {
-          T(ix,iy).s = Ti;
+          const double Ti      = sim.initialConditions.Ti            [n];
+          const double xcenter = sim.initialConditions.xignition     [n];
+          const double ycenter = sim.initialConditions.yignition     [n];
+          const double xside   = sim.initialConditions.xside_ignition[n];
+          const double yside   = sim.initialConditions.yside_ignition[n];
+          if ( std::fabs(x-xcenter) < 0.5*xside && std::fabs(y-ycenter) < 0.5*yside)
+          {
+            T(ix,iy).s = Ti;
+          }
         }
-        else
+        for (int n = 0; n < sim.initialConditions.number_of_roads; n++)
         {
-          T(ix,iy).s = Ta;
+          const double Ti      = sim.initialConditions.Troad     [n];
+          const double xcenter = sim.initialConditions.xroad     [n];
+          const double ycenter = sim.initialConditions.yroad     [n];
+          const double xside   = sim.initialConditions.xside_road[n];
+          const double yside   = sim.initialConditions.yside_road[n];
+          if ( std::fabs(x-xcenter) < 0.5*xside && std::fabs(y-ycenter) < 0.5*yside)
+          {
+            T(ix,iy).s = Ti;
+            S1(ix,iy).s = 0.0;
+            S2(ix,iy).s = 0.0;
+          }
         }
       }
     }

@@ -86,11 +86,26 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
 
     // initial condition parameters
     sim.initialConditions.Ta      = parser("-Ta"     ).asDouble(300);
-    sim.initialConditions.Ti      = parser("-Ti"     ).asDouble(1200);
-    sim.initialConditions.xcenter = parser("-xcenter").asDouble(100);
-    sim.initialConditions.ycenter = parser("-ycenter").asDouble(250);
-    sim.initialConditions.xside   = parser("-xside"  ).asDouble(20);
-    sim.initialConditions.yside   = parser("-yside"  ).asDouble(30);
+
+    sim.initialConditions.number_of_zones = parser("-zones").asInt(1);
+    for (int i = 0; i < sim.initialConditions.number_of_zones; i++)
+    {
+      sim.initialConditions.Ti.push_back            (parser("-Ti"             + std::to_string(i)).asDouble(1200) );
+      sim.initialConditions.xignition.push_back     (parser("-xignition"      + std::to_string(i)).asDouble(100)  );
+      sim.initialConditions.yignition.push_back     (parser("-yignition"      + std::to_string(i)).asDouble(250)  );
+      sim.initialConditions.xside_ignition.push_back(parser("-xside_ignition" + std::to_string(i)).asDouble(20)   );
+      sim.initialConditions.yside_ignition.push_back(parser("-yside_ignition" + std::to_string(i)).asDouble(30)   );
+    }
+
+    sim.initialConditions.number_of_roads = parser("-roads").asInt(0);
+    for (int i = 0; i < sim.initialConditions.number_of_zones; i++)
+    {
+      sim.initialConditions.Troad.push_back     (parser("-Troad"      + std::to_string(i)).asDouble(300));
+      sim.initialConditions.xroad.push_back     (parser("-xroad"      + std::to_string(i)).asDouble(500));
+      sim.initialConditions.yroad.push_back     (parser("-yroad"      + std::to_string(i)).asDouble(500));
+      sim.initialConditions.xside_road.push_back(parser("-xside_road" + std::to_string(i)).asDouble(500));
+      sim.initialConditions.yside_road.push_back(parser("-yside_road" + std::to_string(i)).asDouble(20) );
+    }
 
     // velocity field parameters
     sim.velocityField.z0     = parser("-z0"    ).asDouble(0.25);

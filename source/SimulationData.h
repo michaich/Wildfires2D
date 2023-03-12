@@ -95,12 +95,23 @@ struct SimulationData
   // initial condition parameters
   struct InitialConditions
   {
-    double Ta;
-    double Ti;
-    double xcenter;
-    double ycenter;
-    double xside;
-    double yside;
+    double Ta; //temperature without fire (~300K)
+
+    //ignition zones
+    int number_of_zones;
+    std::vector<double> Ti;
+    std::vector<double> xignition;
+    std::vector<double> yignition;
+    std::vector<double> xside_ignition;
+    std::vector<double> yside_ignition;
+
+    //roads (zero starting fuel)
+    int number_of_roads;
+    std::vector<double> Troad;
+    std::vector<double> xroad;
+    std::vector<double> yroad;
+    std::vector<double> xside_road;
+    std::vector<double> yside_road;
   };
   InitialConditions initialConditions;
 
