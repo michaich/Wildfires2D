@@ -43,8 +43,13 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.bpdx     = parser("-bpdx"    ).asInt(2)   ; //initial number of blocks in x-direction
     sim.bpdy     = parser("-bpdy"    ).asInt(2)   ; //initial number of blocks in y-direction
     sim.levelMax = parser("-levelMax").asInt(6)   ; //max number of refinement levels
-    sim.Rtol     = parser("-Rtol"    ).asDouble(1000); //tolerance for mesh refinement
-    sim.Ctol     = parser("-Ctol"    ).asDouble(400); //tolerance for mesh compression
+
+    sim.TRtol     = parser("-TRtol"    ).asDouble(800); //tolerance for mesh refinement
+    sim.TCtol     = parser("-TCtol"    ).asDouble(400); //tolerance for mesh compression
+    sim.gradRtol  = parser("-gradRtol" ).asDouble(10 ); //tolerance for mesh refinement (grad T)
+    sim.gradCtol  = parser("-gradCtol" ).asDouble(0.1); //tolerance for mesh compression (grad T)
+
+
 
     sim.AdaptSteps = parser("-AdaptSteps").asInt(20)              ; //check for refinement every this many timesteps
     sim.levelStart = parser("-levelStart").asInt(sim.levelMax - 1); //initial level of refinement

@@ -38,8 +38,10 @@ struct SimulationData
   int bpdy;       // blocks in y-direction at refinement level 0
   int levelMax;   // maximum number of refinement levels
   int levelStart; // the mesh starts (at t=0) as a uniform mesh at refinement level 'levelStart'
-  double Rtol;    // refine the mesh if T(t,x,y) > Rtol
-  double Ctol;    // compress the mesh if T(t,x,y) < Ctol
+  double TRtol;    // refine the mesh if T(t,x,y) > TRtol
+  double TCtol;    // compress the mesh if T(t,x,y) < TCtol
+  double gradRtol;    // refine the mesh if grad T(t,x,y) > gradRtol
+  double gradCtol;    // compress the mesh if grad T(t,x,y) < gradCtol
   int AdaptSteps; // check for mesh refinement/compression once every 'AdaptSteps' timesteps
   double minH;    // minimum grid spacing possible (at level = levelmax - 1)
   double maxH;    // maximum grid spacing possible (at level = 0)

@@ -12,10 +12,10 @@ class AdaptTheMesh : public Operator
 
   AdaptTheMesh(SimulationData& s) : Operator(s)
   {
-    T_amr  = new ScalarAMR(*sim.T ,sim.Rtol,sim.Ctol);
-    S1_amr = new ScalarAMR(*sim.S1,sim.Rtol,sim.Ctol);
-    S2_amr = new ScalarAMR(*sim.S2,sim.Rtol,sim.Ctol);
-    tmp_amr = new ScalarAMR(*sim.tmp,sim.Rtol,sim.Ctol);
+    T_amr   = new ScalarAMR(*sim.T  ,1.0,0.01);
+    S1_amr  = new ScalarAMR(*sim.S1 ,1.0,0.01);
+    S2_amr  = new ScalarAMR(*sim.S2 ,1.0,0.01);
+    tmp_amr = new ScalarAMR(*sim.tmp,1.0,0.01);
   }
 
   ~AdaptTheMesh()
