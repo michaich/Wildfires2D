@@ -374,7 +374,6 @@ double Simulation::calcMaxTimestep()
   //Now that we found the dispersion coefficients we can compute the maximum allowed timestep
   const double dtDiffusion = 0.25*h*h/(sim.Deffx+sim.Deffy+0.25*h*uMax);
   sim.dt = std::min({ dtDiffusion, dtAdvection});
-  if (sim.verbose == 0) std::cout << "dtDiffusion=" << dtDiffusion << " dtAdvection = " << dtAdvection << std::endl; 
 
   return sim.dt;
 }
