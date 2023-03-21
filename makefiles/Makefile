@@ -8,9 +8,9 @@ else
   ERROR += "MPICXX not set"
 endif
 
-ifneq ($(ERROR),)
-	$(error $(ERROR))
-endif
+#ifneq ($(ERROR),)
+#	$(error $(ERROR))
+#endif
 
 # LOAD FLAGS -- GCC NEEDED
 CPPFLAGS+= -std=c++17 -Wall -g
