@@ -5,12 +5,8 @@ openmp ?= false
 ifneq ($(MPICXX),)
   CXX=$(MPICXX)
 else
-  ERROR += "MPICXX not set"
+  CXX=mpicxx
 endif
-
-#ifneq ($(ERROR),)
-#	$(error $(ERROR))
-#endif
 
 # LOAD FLAGS -- GCC NEEDED
 CPPFLAGS+= -std=c++17 -Wall -g
@@ -43,8 +39,7 @@ endif
 
 ## SET VPATH FOR MAKE TO SEARCH FOR FILES
 BUILDDIR = .
-DIRS = $(sort $(dir $(wildcard ../source/*/)))
-VPATH := $(DIRS) $(BUILDDIR)/../Cubism/src/
+VPATH := $(BUILDDIR)/../source/ $(BUILDDIR)/../Cubism/src/
 
 OBJECTS = Simulation.o SimulationData.o Helpers.o ArgumentParser.o advDiff.o AdaptTheMesh.o
 
@@ -52,8 +47,6 @@ OBJECTS = Simulation.o SimulationData.o Helpers.o ArgumentParser.o advDiff.o Ada
 all: simulation
 .DEFAULT: all;
 
-simulation: main.o $(OBJECTS)
-	$(CXX) main.o $(OBJECTS) $(LIBS) -o $@
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
@@ -63,3 +56,5 @@ simulation: main.o $(OBJECTS)
 
 clean:
 	rm -f simulation *.o
+simulation: main.o $(OBJECTS)
+	$(CXX) main.o $(OBJECTS) $(LIBS) -o $@
