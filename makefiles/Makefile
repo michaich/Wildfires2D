@@ -16,6 +16,7 @@ CPPFLAGS+= -Wwrite-strings -Wno-unused-parameter #-Wno-cpp
 CPPFLAGS+= -Wno-float-equal
 CPPFLAGS+= -Wno-redundant-decls
 CPPFLAGS+= -Wno-unknown-pragmas
+CPPFLAGS+= -Wno-unused-result
 
 # SET FLAGS FOR CUBISM
 CPPFLAGS+= -D_BS_=$(bs) -DCUBISM_ALIGNMENT=32 -I$(BUILDDIR)/../Cubism/include/ -DDIMENSION=2 -DCUBISM_USE_MAP
