@@ -16,15 +16,14 @@ using Real = double;
 #include <Cubism/BlockLabMPI.h>
 #include <Cubism/StencilInfo.h>
 #include <Cubism/AMR_MeshAdaptation.h>
-#include <Cubism/AMR_MeshAdaptationMPI.h>
 #include <Cubism/Definitions.h>
 #include "Cubism/Profiler.h"
 
 using ScalarElement = cubism::ScalarElement<double>;
 using ScalarBlock   = cubism::GridBlock<_BS_,2,ScalarElement>;
 using ScalarGrid    = cubism::GridMPI<cubism::Grid<ScalarBlock, std::allocator>>;
-using ScalarLab     = cubism::BlockLabMPI<cubism::BlockLabNeumann  <ScalarBlock, 2,std::allocator>,ScalarGrid>;
-using ScalarAMR     = cubism::MeshAdaptationMPI<ScalarGrid,ScalarLab,ScalarGrid>;
+using ScalarLab     = cubism::BlockLabMPI<cubism::BlockLabNeumann  <ScalarGrid, 2,std::allocator>>;
+using ScalarAMR     = cubism::MeshAdaptation<ScalarLab>;
 
 
 struct SimulationData

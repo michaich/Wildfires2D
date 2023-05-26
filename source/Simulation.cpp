@@ -255,7 +255,7 @@ double Simulation::calcMaxTimestep()
     for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
     for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
     {
-      Tmax = max(T(ix,iy).s,Tmax);
+      Tmax = std::max(T(ix,iy).s,Tmax);
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &Tmax, 1, MPI_DOUBLE, MPI_MAX, sim.comm);
@@ -330,13 +330,13 @@ double Simulation::calcMaxTimestep()
         if ( (std::fabs(mydeltaTx-dT) < eps || dT < mydeltaTx) && dx < mydxmin )
         {
           mydxmin = dx;
-          mydeltaTx = min(dT,mydeltaTx);
+          mydeltaTx = std::min(dT,mydeltaTx);
           myxtarget = p[0];
         }
         if ( (std::fabs(mydeltaTy-dT) < eps || dT < mydeltaTy) && dy < mydymin )
         {
           mydymin = dy;
-          mydeltaTy = min(dT,mydeltaTy);
+          mydeltaTy = std::min(dT,mydeltaTy);
           myytarget = p[1];
         }
       }

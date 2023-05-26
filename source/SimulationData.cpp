@@ -1,7 +1,6 @@
 #include "SimulationData.h"
 #include "Helpers.h"
 #include <Cubism/HDF5Dumper.h>
-#include <Cubism/HDF5Dumper_MPI.h>
 #include <iomanip>
 using namespace cubism;
 
