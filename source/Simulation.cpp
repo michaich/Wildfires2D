@@ -108,12 +108,12 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     }
 
     // velocity field parameters
-    sim.velocityField.z0     = parser("-z0"    ).asDouble(0.25);
-    sim.velocityField.lambda = parser("-lambda").asDouble(0.04);
-    sim.velocityField.alpha  = parser("-alpha" ).asDouble(3);
-    sim.velocityField.kappa  = parser("-kappa" ).asDouble(0.41);
-    sim.velocityField.u10x   = parser("-u10x"  ).asDouble(5);
-    sim.velocityField.u10y   = parser("-u10y"  ).asDouble(5);
+    sim.z0     = parser("-z0"   ).asDouble(0.25);
+    sim.delta  = parser("-delta").asDouble(0.04);
+    sim.eta    = parser("-eta"  ).asDouble(3);
+    sim.kappa  = parser("-kappa").asDouble(0.41);
+    sim.u10x   = parser("-u10x" ).asDouble(5);
+    sim.u10y   = parser("-u10y" ).asDouble(5);
 
     // fuel initial conditions
     sim.S1min = parser("-S1min").asDouble(0.15);
@@ -130,20 +130,13 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.lambda = sim.rhog/sim.rhos;
 
     // (constant) velocity field, derived from all parameters above
-    const double z0     = sim.velocityField.z0;
-    const double kappa  = sim.velocityField.kappa;
-    const double u10x   = sim.velocityField.u10x;
-    const double u10y   = sim.velocityField.u10y;
-    const double lambda = sim.velocityField.lambda;
-    const double alpha  = sim.velocityField.alpha;
-    const double H      = sim.H;
-    const double dx     = (H - z0) - lambda*u10x;
-    const double dy     = (H - z0) - lambda*u10y;
-    const double uxstar = u10x * kappa / log((10-dx)/z0);
-    const double uystar = u10y * kappa / log((10-dy)/z0);
-    const double uhx    = uxstar/kappa*log((H-dx)/z0);
-    const double uhy    = uystar/kappa*log((H-dy)/z0);
-    const double coef   = (1.0-exp(-alpha)) / alpha; 
+    const double dx     = (sim.H - sim.z0) - sim.delta*sim.u10x;
+    const double dy     = (sim.H - sim.z0) - sim.delta*sim.u10y;
+    const double uxstar = sim.u10x * sim.kappa / log((10-dx)/sim.z0);
+    const double uystar = sim.u10y * sim.kappa / log((10-dy)/sim.z0);
+    const double uhx    = uxstar/sim.kappa*log((sim.H-dx)/sim.z0);
+    const double uhy    = uystar/sim.kappa*log((sim.H-dy)/sim.z0);
+    const double coef   = (1.0-exp(-sim.eta)) / sim.eta;
     sim.ux = uhx*coef;
     sim.uy = uhy*coef;
     if (sim.verbose) std::cout << "[WS2D] Velocity Field: ux = " << sim.ux << " uy = " << sim.uy << std::endl;

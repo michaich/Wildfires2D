@@ -115,16 +115,14 @@ struct SimulationData
   InitialConditions initialConditions;
 
   // velocity field parameters
-  struct VelocityField
-  {
-    double z0;
-    double lambda;
-    double alpha;
-    double kappa;
-    double u10x;
-    double u10y;
-  };
-  VelocityField velocityField;
+  double delta;
+  double eta;
+  double z0;
+  double kappa;
+  double u10x;
+  double u10y;
+
+
   double ux; // x-component of velocity field (constant, at least for now)
   double uy; // y-component of velocity field (constant, at least for now)
 
