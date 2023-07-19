@@ -1,53 +1,57 @@
 bs ?= 8
 openmp ?= false
 
-# SET FLAGS FOR COMPILER
+# Set compiler
 ifneq ($(MPICXX),)
   CXX=$(MPICXX)
 else
   CXX=mpicxx
 endif
 
-# LOAD FLAGS -- GCC NEEDED
-CPPFLAGS+= -std=c++17 -Wall -g
-CPPFLAGS+= -Wextra -Wfloat-equal -Wcast-align -Woverloaded-virtual
-CPPFLAGS+= -Wlogical-op -Wmissing-declarations -Wredundant-decls -Wshadow
-CPPFLAGS+= -Wwrite-strings -Wno-unused-parameter #-Wno-cpp
-CPPFLAGS+= -Wno-float-equal
-CPPFLAGS+= -Wno-redundant-decls
+# Set flags for warnings (gcc compiler needed)
+CPPFLAGS+= -std=c++17 -g
+CPPFLAGS+= -Wall
+CPPFLAGS+= -Wextra
+CPPFLAGS+= -Wfloat-equal
+CPPFLAGS+= -Woverloaded-virtual
+CPPFLAGS+= -Wmissing-declarations
+CPPFLAGS+= -Wredundant-decls
+CPPFLAGS+= -Wshadow
+CPPFLAGS+= -Wwrite-strings
 CPPFLAGS+= -Wno-unknown-pragmas
-CPPFLAGS+= -Wno-unused-result
+CPPFLAGS+= -Wno-unused-parameter
+CPPFLAGS+= -Wno-deprecated-declarations
 
-# SET FLAGS FOR CUBISM
-CPPFLAGS+= -D_BS_=$(bs) -DCUBISM_ALIGNMENT=32 -I$(BUILDDIR)/../Cubism/include/ -DDIMENSION=2 -DCUBISM_USE_MAP
+# Set flags for Cubism
+CPPFLAGS+= -D_BS_=$(bs) -DCUBISM_ALIGNMENT=32 -I$(BUILDDIR)/../Cubism/include/ -DDIMENSION=2
 
-#Optimizations
+# Set flags for compiler optimizations
 CPPFLAGS+= -DNDEBUG -O3 -fstrict-aliasing -march=native -mtune=native -falign-functions -ftree-vectorize -fmerge-all-constants -ffast-math
 
+# Set flags for OpenMP and HDF5 libraries
 ifeq "$(openmp)" "true"
-	CPPFLAGS+= -fopenmp
+	CPPFLAGS+= -fopenmp -DUSEOPENMP
+	LIBS+= -fopenmp
 endif
+LIBS+= -lhdf5
 
-# FLAGS FOR EXTERNAL LIBRARIES
-LIBS+= -fopenmp -lhdf5
-
-# ADD LIBRARY PATHS IF GIVEN
+# Add library paths, if given
 ifneq ($(HDF5_ROOT),)
 	LIBS     += -L$(HDF5_ROOT)/lib
 	CPPFLAGS += -I$(HDF5_ROOT)/include
 endif
 
-
-## SET VPATH FOR MAKE TO SEARCH FOR FILES
+### Set VPATH for MAKE to search for files
+#VPATH := ../source/ ../Cubism/src/
 BUILDDIR = .
 VPATH := $(BUILDDIR)/../source/ $(BUILDDIR)/../Cubism/src/
+
 
 OBJECTS = Simulation.o SimulationData.o Helpers.o ArgumentParser.o advDiff.o AdaptTheMesh.o
 
 # DEFINE COMPILATION TARGETS
 all: simulation
 .DEFAULT: all;
-
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
@@ -57,5 +61,6 @@ all: simulation
 
 clean:
 	rm -f simulation *.o
+
 simulation: main.o $(OBJECTS)
 	$(CXX) main.o $(OBJECTS) $(LIBS) -o $@

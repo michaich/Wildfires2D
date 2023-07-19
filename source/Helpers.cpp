@@ -11,7 +11,11 @@ void IC::operator()(const double dt)
 
   #pragma omp parallel
   {
+    #ifdef USEOPENMP
     const int tid = omp_get_thread_num();
+    #else
+    const int tid = 0;
+    #endif
     std::default_random_engine generator (sim.ic_seed + tid);
     std::uniform_real_distribution<double> distributionS1 (sim.S1min,sim.S1max);
     std::uniform_real_distribution<double> distributionS2 (sim.S2min,sim.S2max);

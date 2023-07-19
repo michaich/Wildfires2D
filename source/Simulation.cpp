@@ -22,10 +22,15 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
       std::cout <<"    Wildfire spread 2D    \n";
       std::cout <<"==========================\n";
       parser.print_args();
+      #ifdef USEOPENMP
+      const int nthreads = omp_get_num_threads();
+      #else
+      const int nthreads = 1;
+      #endif
       #pragma omp parallel
       {
         #pragma omp master
-        std::cout << "[WS2D] Running with " << size << " rank(s) and " << omp_get_num_threads() << " thread(s).\n"; 
+        std::cout << "[WS2D] Running with " << size << " rank(s) and " << nthreads << " thread(s).\n"; 
       }
     }
   }

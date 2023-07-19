@@ -2,11 +2,14 @@
 using Real = double;
 #define MPI_Real MPI_DOUBLE
 
+#ifdef USEOPENMP
+#include <omp.h>
+#endif
+
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <vector>
-#include <omp.h>
 #include <memory>
 #include <Cubism/ArgumentParser.h>
 #include <Cubism/Grid.h>
