@@ -24,8 +24,8 @@ struct KernelAdvectDiffuse
       double uy = 0.0;
       sim.getVelocity(info.blockID,x,y,ux,uy);
 
-      const double Deffx = sim.Dbuoyx + sim.Ad * ux * sim.Lcx;
-      const double Deffy = sim.Dbuoyy + sim.Ad * uy * sim.Lcy;
+      const double Deffx = sim.Drb + sim.Ad * ux * sim.Lcx;
+      const double Deffy = sim.Drb + sim.Ad * uy * sim.Lcy;
 
       const double dTdx = ux > 0 ? h*(c[0]*T(x+1,y).s + c[1]*T(x,y).s + c[2]*T(x-1,y).s + c[3]*T(x-2,y).s) :
                                   -h*(c[0]*T(x-1,y).s + c[1]*T(x,y).s + c[2]*T(x+1,y).s + c[3]*T(x+2,y).s);
@@ -51,7 +51,7 @@ struct KernelAdvectDiffuse
       for(int y=0; y<NY; ++y)
       {
         sim.getVelocity(info.blockID,x,y,ux,uy);
-        const double Deffx = sim.Dbuoyx + sim.Ad * ux * sim.Lcx;
+        const double Deffx = sim.Drb + sim.Ad * ux * sim.Lcx;
         faceXm[y] = Deffx*(T(x,y) - T(x-1,y));
         faceXm[y] -= ux*h/6.0* (ux > 0 ? (2.0*T(x  ,y)+5.0*T(x-1,y)-T(x-2,y)):(-2.0*T(x  ,y)-5.0*T(x+1,y)+T(x+2,y)) );
       }
@@ -62,7 +62,7 @@ struct KernelAdvectDiffuse
       for(int y=0; y<NY; ++y)
       {
         sim.getVelocity(info.blockID,x,y,ux,uy);
-        const double Deffx = sim.Dbuoyx + sim.Ad * ux * sim.Lcx;
+        const double Deffx = sim.Drb + sim.Ad * ux * sim.Lcx;
         faceXp[y] = Deffx*(T(x,y) - T(x+1,y));
         faceXp[y] += ux*h/6.0* (ux > 0 ? (2.0*T(x+1,y)+5.0*T(x  ,y)-T(x-1,y)):(-2.0*T(x-1,y)-5.0*T(x  ,y)+T(x+1,y)) );
       }
@@ -73,7 +73,7 @@ struct KernelAdvectDiffuse
       for(int x=0; x<NX; ++x)
       {
         sim.getVelocity(info.blockID,x,y,ux,uy);
-        const double Deffy = sim.Dbuoyy + sim.Ad * uy * sim.Lcy;
+        const double Deffy = sim.Drb + sim.Ad * uy * sim.Lcy;
         faceYm[x] = Deffy*(T(x,y) - T(x,y-1));
         faceYm[x] -= uy*h/6.0* (uy > 0 ? (2.0*T(x,y  )+5.0*T(x,y-1)-T(x,y-2)):(-2.0*T(x,y  )-5.0*T(x,y+1)+T(x,y+2)) );
       }
@@ -84,7 +84,7 @@ struct KernelAdvectDiffuse
       for(int x=0; x<NX; ++x)
       {
         sim.getVelocity(info.blockID,x,y,ux,uy);
-        const double Deffy = sim.Dbuoyy + sim.Ad * uy * sim.Lcy;
+        const double Deffy = sim.Drb + sim.Ad * uy * sim.Lcy;
         faceYp[x] = Deffy*(T(x,y) - T(x,y+1));
         faceYp[x] += uy*h/6.0* (uy > 0 ? (2.0*T(x,y+1)+5.0*T(x,y  )-T(x,y-1)):(-2.0*T(x,y-1)-5.0*T(x,y  )+T(x,y+1)) );
       }

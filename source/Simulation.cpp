@@ -74,8 +74,8 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.cs2     = parser("-cs2"    ).asDouble(40);
     sim.b1      = parser("-b1"     ).asDouble(4500);
     sim.b2      = parser("-b2"     ).asDouble(7000);
-    sim.rm0      = parser("-rm0"     ).asDouble(0.002);
-    sim.rmc      = parser("-rmc"     ).asDouble(0.004);
+    sim.rm0     = parser("-rm0"    ).asDouble(0.002);
+    sim.rmc     = parser("-rmc"    ).asDouble(0.004);
     sim.Anc     = parser("-Anc"    ).asDouble(1);
     sim.epsilon = parser("-epsilon").asDouble(0.3);
     sim.sigmab  = parser("-sigmab" ).asDouble(5.67e-8);
@@ -86,8 +86,7 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.cpg     = parser("-cpg"    ).asDouble(1043);
     sim.A1      = parser("-A1"     ).asDouble(22e5);
     sim.A2      = parser("-A2"     ).asDouble(2e7);
-    sim.Dbuoyx  = parser("-Dbuoyx" ).asDouble(0.8);
-    sim.Dbuoyy  = parser("-Dbuoyy" ).asDouble(1);
+    sim.Drb     = parser("-Drb"    ).asDouble(0.1);
     sim.Ad      = parser("-Ad"     ).asDouble(0.125);
 
     // initial condition parameters
@@ -397,8 +396,8 @@ double Simulation::calcMaxTimestep()
         double uy = 0.0;
         sim.getVelocity(i,ix,iy,ux,uy);
         const double ut2   = (ux*ux+uy*uy);
-        const double Deffx = sim.Dbuoyx + sim.Ad * ux * sim.Lcx;
-        const double Deffy = sim.Dbuoyy + sim.Ad * uy * sim.Lcy;
+        const double Deffx = sim.Drb + sim.Ad * ux * sim.Lcx;
+        const double Deffy = sim.Drb + sim.Ad * uy * sim.Lcy;
         Dx_max = std::max(Dx_max,Deffx);
         Dy_max = std::max(Dy_max,Deffy);
         u_max =  std::max(u_max,ut2);
