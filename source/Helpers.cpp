@@ -26,6 +26,7 @@ void IC::operator()(const double dt)
       auto & T  = (*sim.T)(i);
       auto & S1 = (*sim.S1)(i);
       auto & S2 = (*sim.S2)(i);
+      auto & S2_0 = (*sim.S2_0)(i);
       for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
       for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
       {
@@ -66,17 +67,6 @@ void IC::operator()(const double dt)
             S2(ix,iy).s = 0.0;
           }
         }
-      }
-    }
-
-    #pragma omp for
-    for (size_t i=0; i < TInfo.size(); i++)
-    {
-      auto & S2_0 = (*sim.S2_0)(i);
-      const auto & S2 = (*sim.S2)(i);
-      for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
-      for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
-      {
         S2_0(ix,iy).s = S2(ix,iy).s;
       }
     }
