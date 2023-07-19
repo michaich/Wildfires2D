@@ -92,8 +92,7 @@ struct SimulationData
   double cpg;
   double A1;
   double A2;
-  double Dbuoyx;
-  double Dbuoyy;
+  double Drb;
   double Ad;
 
   // initial condition parameters
