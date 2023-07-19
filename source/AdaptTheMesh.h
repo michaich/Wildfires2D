@@ -8,6 +8,7 @@ class AdaptTheMesh : public Operator
   ScalarAMR *  T_amr  = nullptr;
   ScalarAMR * S1_amr  = nullptr;
   ScalarAMR * S2_amr  = nullptr;
+  ScalarAMR * S2_0_amr  = nullptr;
   ScalarAMR * tmp_amr  = nullptr;
 
   AdaptTheMesh(SimulationData& s) : Operator(s)
@@ -15,6 +16,7 @@ class AdaptTheMesh : public Operator
     T_amr   = new ScalarAMR(*sim.T  ,1.0,0.01);
     S1_amr  = new ScalarAMR(*sim.S1 ,1.0,0.01);
     S2_amr  = new ScalarAMR(*sim.S2 ,1.0,0.01);
+    S2_0_amr  = new ScalarAMR(*sim.S2_0 ,1.0,0.01);
     tmp_amr = new ScalarAMR(*sim.tmp,1.0,0.01);
   }
 
@@ -23,6 +25,7 @@ class AdaptTheMesh : public Operator
     if( T_amr   not_eq nullptr ) delete T_amr ;
     if( S1_amr  not_eq nullptr ) delete S1_amr;
     if( S2_amr  not_eq nullptr ) delete S2_amr;
+    if( S2_0_amr  not_eq nullptr ) delete S2_0_amr;
     if( tmp_amr  not_eq nullptr ) delete tmp_amr;
   }
 

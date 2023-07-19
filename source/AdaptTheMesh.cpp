@@ -56,11 +56,13 @@ void AdaptTheMesh::operator()(const Real dt)
   T_amr  ->TagLike(tmpInfo);
   S1_amr ->TagLike(tmpInfo);
   S2_amr ->TagLike(tmpInfo);
+  S2_0_amr ->TagLike(tmpInfo);
 
   //Do the refinement/compression. Print output only for temperature (if sim.verbose = true).
   T_amr  ->Adapt(sim.time, sim.verbose,false); // last flag set to false means we interpolate values when refining
   S1_amr ->Adapt(sim.time, false      ,false); // last flag set to false means we interpolate values when refining
   S2_amr ->Adapt(sim.time, false      ,false); // last flag set to false means we interpolate values when refining
+  S2_0_amr ->Adapt(sim.time, false      ,false); // last flag set to false means we interpolate values when refining
   tmp_amr->Adapt(sim.time, false      ,true ); // last flag set to true  means we do not interpolate values when refining
 
   sim.stopProfiler();

@@ -15,6 +15,7 @@ void SimulationData::allocateGrid()
   T   = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
   S1  = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
   S2  = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
+  S2_0  = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
   tmp = new ScalarGrid (bpdx,bpdy,bpdz,extent,levelStart,levelMax,comm,xper,yper,zper);
 
   const std::vector<BlockInfo>& TInfo = T->getBlocksInfo();
@@ -44,6 +45,7 @@ SimulationData::~SimulationData()
   if(T   not_eq nullptr) delete T ;
   if(S1  not_eq nullptr) delete S1;
   if(S2  not_eq nullptr) delete S2;
+  if(S2_0  not_eq nullptr) delete S2_0;
   if(tmp not_eq nullptr) delete tmp;
 }
 
@@ -93,4 +95,13 @@ void SimulationData::dumpAll(std::string name)
   DumpHDF5_MPI<StreamerScalar,Real>(*S1, time, "S1_" + ss.str(), path4serialization);
   DumpHDF5_MPI<StreamerScalar,Real>(*S2, time, "S2_" + ss.str(), path4serialization);
   stopProfiler();
+}
+
+void SimulationData::getVelocity(const size_t blockID, const int x, const int y, double & ux, double & uy) const
+{
+  const auto & bS2_0 = (*S2_0)(blockID);
+  const auto & bS2   = (*S2)  (blockID);
+  const double xc = bS2(x,y).s/(bS2_0(x,y).s+1e-21);
+  ux = uvx+(ubx-uvx)*(1.0-xc);
+  uy = uvy+(uby-uvy)*(1.0-xc);
 }

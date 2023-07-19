@@ -74,7 +74,8 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.cs2     = parser("-cs2"    ).asDouble(40);
     sim.b1      = parser("-b1"     ).asDouble(4500);
     sim.b2      = parser("-b2"     ).asDouble(7000);
-    sim.rm      = parser("-rm"     ).asDouble(0.003);
+    sim.rm0      = parser("-rm0"     ).asDouble(0.002);
+    sim.rmc      = parser("-rmc"     ).asDouble(0.004);
     sim.Anc     = parser("-Anc"    ).asDouble(1);
     sim.epsilon = parser("-epsilon").asDouble(0.3);
     sim.sigmab  = parser("-sigmab" ).asDouble(5.67e-8);
@@ -134,17 +135,32 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.gamma = sim.cpg/sim.cps;
     sim.lambda = sim.rhog/sim.rhos;
 
-    // (constant) velocity field, derived from all parameters above
-    const double dx     = (sim.H - sim.z0) - sim.delta*sim.u10x;
-    const double dy     = (sim.H - sim.z0) - sim.delta*sim.u10y;
-    const double uxstar = sim.u10x * sim.kappa / log((10-dx)/sim.z0);
-    const double uystar = sim.u10y * sim.kappa / log((10-dy)/sim.z0);
-    const double uhx    = uxstar/sim.kappa*log((sim.H-dx)/sim.z0);
-    const double uhy    = uystar/sim.kappa*log((sim.H-dy)/sim.z0);
-    const double coef   = (1.0-exp(-sim.eta)) / sim.eta;
-    sim.ux = uhx*coef;
-    sim.uy = uhy*coef;
-    if (sim.verbose) std::cout << "[WS2D] Velocity Field: ux = " << sim.ux << " uy = " << sim.uy << std::endl;
+    // constant velocity field, dense canopy
+    {
+      const double dx     = (sim.H - sim.z0) - sim.delta*sim.u10x;
+      const double dy     = (sim.H - sim.z0) - sim.delta*sim.u10y;
+      const double uxstar = sim.u10x * sim.kappa / log((10-dx)/sim.z0);
+      const double uystar = sim.u10y * sim.kappa / log((10-dy)/sim.z0);
+      const double coef   = (1.0-exp(-sim.eta)) / sim.eta;
+      sim.uvx = coef*uxstar/sim.kappa*log((sim.H-dx)/sim.z0);
+      sim.uvy = coef*uystar/sim.kappa*log((sim.H-dy)/sim.z0);
+    }
+
+    // constant velocity field, burned area
+    {
+      const double aux = sim.kappa / log(10/sim.z0);
+      const double uxstar = sim.u10x * aux;
+      const double uystar = sim.u10y * aux;
+      const double coef   = 0.5*(sim.H/(sim.H-sim.z0)*log(sim.H/sim.z0)-1.0)/sim.kappa;
+      sim.ubx = coef*uxstar;
+      sim.uby = coef*uystar;
+    }
+
+    if (sim.verbose)
+    {
+      std::cout << "[WS2D] Velocity Field: uvx = " << sim.uvx << " uvy = " << sim.uvy << std::endl;
+      std::cout << "[WS2D] Velocity Field: ubx = " << sim.ubx << " uby = " << sim.uby << std::endl;
+    }
   }
 
   //3. Allocate grids
@@ -236,12 +252,6 @@ void Simulation::simulate()
 double Simulation::calcMaxTimestep()
 {
   const double eps = 1.0;
-  const double h = sim.getH();
-  const double uMax = sqrt(sim.ux*sim.ux+sim.uy*sim.uy);
-  const double dtAdvection = sim.CFL * h / ( uMax + 1e-8 ); //assuming C1/C0 = 1
-
-  //To compute the current maximum timestep, we first need to find the dispersion coefficients.
-  //This is done in the steps outlined below.
 
   //1. Find maximum temperature
   const std::vector<BlockInfo>& TInfo = sim.T->getBlocksInfo();
@@ -302,8 +312,6 @@ double Simulation::calcMaxTimestep()
   double dymin   = 1e10;
   double xtarget = 1e10;
   double ytarget = 1e10;
-  const int signx = sim.ux > 0 ? 1:-1;
-  const int signy = sim.uy > 0 ? 1:-1;
   #pragma omp parallel
   {
     double mydeltaTx = 1e10;
@@ -319,6 +327,11 @@ double Simulation::calcMaxTimestep()
       for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
       for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
       {
+        double ux = 0.0;
+        double uy = 0.0;
+        sim.getVelocity(i,ix,iy,ux,uy);
+        const int signx = ux > 0 ? 1:-1;
+        const int signy = uy > 0 ? 1:-1;
         double p[2];
         TInfo[i].pos(p,ix,iy);
         const double dx = signx*(p[0]-xmax) > 0 ? std::fabs(p[0]-xmax) : 1e10;
@@ -356,22 +369,57 @@ double Simulation::calcMaxTimestep()
     }
   }
 
-  double Lcx = std::fabs(xmax-xtarget);
-  double Lcy = std::fabs(ymax-ytarget);
+  sim.Lcx = std::fabs(xmax-xtarget);
+  sim.Lcy = std::fabs(ymax-ytarget);
 
   //now keep the minimum Lc among ranks
-  MPI_Allreduce(MPI_IN_PLACE, &Lcx, 1, MPI_DOUBLE, MPI_MIN, sim.comm);
-  MPI_Allreduce(MPI_IN_PLACE, &Lcy, 1, MPI_DOUBLE, MPI_MIN, sim.comm);
+  {
+    double results[2] = {sim.Lcx,sim.Lcy};
+    MPI_Allreduce(MPI_IN_PLACE, results, 2, MPI_DOUBLE, MPI_MIN, sim.comm);
+    sim.Lcx = results[0];
+    sim.Lcy = results[1];
+  }
 
-  if (sim.verbose) std::cout << "   characteristic fire lengths:" << Lcx << "," << Lcy << std::endl;
+  if (sim.verbose) std::cout << "   characteristic fire lengths:" << sim.Lcx << "," << sim.Lcy << std::endl;
 
-  sim.Deffx = sim.Dbuoyx + sim.Ad * sim.ux * Lcx;
-  sim.Deffy = sim.Dbuoyy + sim.Ad * sim.uy * Lcy;
+  double Dx_max = 0;
+  double Dy_max = 0;
+  double  u_max = 0;
+  #pragma omp parallel
+  {
+    #pragma omp for reduction (max:Dx_max,Dy_max,u_max)
+    for (size_t i=0; i < TInfo.size(); i++)
+    {
+      for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
+      for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
+      {
+        double ux = 0.0;
+        double uy = 0.0;
+        sim.getVelocity(i,ix,iy,ux,uy);
+        const double ut2   = (ux*ux+uy*uy);
+        const double Deffx = sim.Dbuoyx + sim.Ad * ux * sim.Lcx;
+        const double Deffy = sim.Dbuoyy + sim.Ad * uy * sim.Lcy;
+        Dx_max = std::max(Dx_max,Deffx);
+        Dy_max = std::max(Dy_max,Deffy);
+        u_max =  std::max(u_max,ut2);
+      }
+    }
+  }
 
+  {
+    double results[3] = {Dx_max,Dy_max,u_max};
+    MPI_Allreduce(MPI_IN_PLACE, results, 3, MPI_DOUBLE, MPI_MAX, sim.comm);
+    Dx_max = results[0];
+    Dy_max = results[1];
+    u_max = std::sqrt(results[2]);
+  }
+
+
+  const double h = sim.getH();
+  const double dtAdvection = sim.CFL * h / ( u_max + 1e-8 ); //assuming C1/C0 = 1
+  const double dtDiffusion = 0.25*h*h/(Dx_max+Dy_max+0.25*h*u_max);
   
   //Now that we found the dispersion coefficients we can compute the maximum allowed timestep
-  const double dtDiffusion = 0.25*h*h/(sim.Deffx+sim.Deffy+0.25*h*uMax);
   sim.dt = std::min({ dtDiffusion, dtAdvection});
-
   return sim.dt;
 }

@@ -71,6 +71,7 @@ struct SimulationData
   ScalarGrid * T  = nullptr; //temperature
   ScalarGrid * S1 = nullptr; //endothermic fuel mass fraction
   ScalarGrid * S2 = nullptr; //exothermic fuel mass fraction
+  ScalarGrid * S2_0 = nullptr; //exothermic fuel mass fraction, t = 0
   ScalarGrid * tmp = nullptr; //auxiliary temporary grid
 
   // parameters/constants of the model
@@ -79,7 +80,8 @@ struct SimulationData
   double cs2;
   double b1;
   double b2;
-  double rm;
+  double rm0;
+  double rmc;
   double Anc;
   double epsilon;
   double sigmab;
@@ -124,10 +126,10 @@ struct SimulationData
   double kappa;
   double u10x;
   double u10y;
-
-
-  double ux; // x-component of velocity field (constant, at least for now)
-  double uy; // y-component of velocity field (constant, at least for now)
+  double ubx; // x-component of velocity (burned area)
+  double uby; // y-component of velocity (burned area)
+  double uvx; // x-component of velocity (dense canopy)
+  double uvy; // y-component of velocity (dense canopy)
 
   // constant terms that depend of the other parameters of the model
   double C2;
@@ -157,6 +159,7 @@ struct SimulationData
   void startProfiler(std::string name); // start measuring execution time of 'name'
   void stopProfiler();                  // stop measuring execution time
   void printResetProfiler();            // print measured execution times
+  void getVelocity(const size_t blockID, const int x, const int y, double & ux, double & uy) const;
 
   SimulationData();  //class contructor
   ~SimulationData(); //class destructor
