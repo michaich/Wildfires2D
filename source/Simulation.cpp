@@ -217,7 +217,24 @@ void Simulation::simulate()
     sim.time += dt;
     sim.step++;
 
-    //5. Save some quantities of interest (if any)
+    #if 0
+    //5. Save some quantities of interest (max temperature, integral of T and integral of T^2)
+    const std::vector<BlockInfo>& TInfo = sim.T->getBlocksInfo();
+    double res [3] =  {0,0,0};
+    for (size_t i=0; i < TInfo.size(); i++)
+    {
+      const double h2 = TInfo[i].h*TInfo[i].h;
+      auto & T  = (*sim.T)(i);
+      for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
+      for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
+      {
+        res[0]  = std::max(T(ix,iy).s,res[0]);
+        res[1] += T(ix,iy).s*h2;
+        res[2] += T(ix,iy).s*T(ix,iy).s*h2;
+      }
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &res[0], 1, MPI_DOUBLE, MPI_MAX, sim.comm);
+    MPI_Allreduce(MPI_IN_PLACE, &res[1], 2, MPI_DOUBLE, MPI_SUM, sim.comm);
     if(sim.rank == 0)
     {
       std::stringstream ssF;
@@ -225,8 +242,9 @@ void Simulation::simulate()
       std::stringstream & fout = logger.get_stream(ssF.str());
       if(sim.step==0)
        fout<<"t dt \n";
-      fout<<sim.time<<" "<<sim.dt<<" \n";
+      fout<<sim.time<<" "<<res[0]<<" "<<res[1]<<" "<<res[2]<<" \n";
     }
+    #endif
 
     //6. Check if simulation should terminate
     if (sim.bOver())
