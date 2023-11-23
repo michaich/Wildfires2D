@@ -12,7 +12,7 @@ endif
 CPPFLAGS= -std=c++17 -g
 
 # Set flags for warnings (gcc compiler needed)
-CPPFLAGS+= -Wall -Wextra -Wfloat-equal -Woverloaded-virtual -Wmissing-declarations -Wredundant-decls -Wshadow -Wwrite-strings -Wno-unknown-pragmas -Wno-unused-parameter -Wno-deprecated-declarations -Wno-unused-result -Wno-cast-function-type
+CPPFLAGS+= -Wall -Wextra -Wno-float-equal -Woverloaded-virtual -Wmissing-declarations -Wredundant-decls -Wshadow -Wwrite-strings -Wno-unknown-pragmas -Wno-unused-parameter -Wno-deprecated-declarations -Wno-unused-result -Wno-cast-function-type
 
 # Set flags for compiler optimizations
 CPPFLAGS+= -DNDEBUG -O3 -fstrict-aliasing -march=native -mtune=native -falign-functions -ftree-vectorize -fmerge-all-constants -ffast-math
