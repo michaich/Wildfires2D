@@ -8,25 +8,17 @@ else
   CXX=mpicxx
 endif
 
+CPPFLAGS= -std=c++17 -g
+
 # Set flags for warnings (gcc compiler needed)
-CPPFLAGS+= -std=c++17 -g
-CPPFLAGS+= -Wall
-CPPFLAGS+= -Wextra
-CPPFLAGS+= -Wfloat-equal
-CPPFLAGS+= -Woverloaded-virtual
-CPPFLAGS+= -Wmissing-declarations
-CPPFLAGS+= -Wredundant-decls
-CPPFLAGS+= -Wshadow
-CPPFLAGS+= -Wwrite-strings
-CPPFLAGS+= -Wno-unknown-pragmas
-CPPFLAGS+= -Wno-unused-parameter
-CPPFLAGS+= -Wno-deprecated-declarations
+CPPFLAGS+= -Wall -Wextra -Wfloat-equal -Woverloaded-virtual -Wmissing-declarations -Wredundant-decls -Wshadow -Wwrite-strings -Wno-unknown-pragmas -Wno-unused-parameter -Wno-deprecated-declarations
+
+# Set flags for compiler optimizations
+CPPFLAGS+= -DNDEBUG -O3 -fstrict-aliasing -march=native -mtune=native -falign-functions -ftree-vectorize -fmerge-all-constants -ffast-math
 
 # Set flags for Cubism
 CPPFLAGS+= -D_BS_=$(bs) -DCUBISM_ALIGNMENT=32 -I$(BUILDDIR)/../Cubism/include/ -DDIMENSION=2
 
-# Set flags for compiler optimizations
-CPPFLAGS+= -DNDEBUG -O3 -fstrict-aliasing -march=native -mtune=native -falign-functions -ftree-vectorize -fmerge-all-constants -ffast-math
 
 # Set flags for OpenMP and HDF5 libraries
 ifeq "$(openmp)" "true"
@@ -35,18 +27,9 @@ ifeq "$(openmp)" "true"
 endif
 LIBS+= -lhdf5
 
-# Add library paths, if given
-ifneq ($(HDF5_ROOT),)
-	LIBS     += -L$(HDF5_ROOT)/lib
-	CPPFLAGS += -I$(HDF5_ROOT)/include
-endif
-
-### Set VPATH for MAKE to search for files
-#VPATH := ../source/ ../Cubism/src/
+#Set VPATH for MAKE to search for files
 BUILDDIR = .
 VPATH := $(BUILDDIR)/../source/ $(BUILDDIR)/../Cubism/src/
-
-
 OBJECTS = Simulation.o SimulationData.o Helpers.o ArgumentParser.o advDiff.o AdaptTheMesh.o
 
 # DEFINE COMPILATION TARGETS
