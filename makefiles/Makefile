@@ -1,13 +1,14 @@
-bs ?= 8
+bs ?= 8 #each block has bs x bs grid points (default here is 8 x 8)
 openmp ?= false
 
 # Set compiler
 ifneq ($(MPICXX),)
   CXX=$(MPICXX)
 else
-  CXX=mpicxx
+  CXX=mpic++
 endif
 
+# Set compiler flags
 CPPFLAGS= -std=c++17 -g
 
 # Set flags for warnings (gcc compiler needed)
@@ -17,8 +18,7 @@ CPPFLAGS+= -Wall -Wextra -Wfloat-equal -Woverloaded-virtual -Wmissing-declaratio
 CPPFLAGS+= -DNDEBUG -O3 -fstrict-aliasing -march=native -mtune=native -falign-functions -ftree-vectorize -fmerge-all-constants -ffast-math
 
 # Set flags for Cubism
-CPPFLAGS+= -D_BS_=$(bs) -DCUBISM_ALIGNMENT=32 -I$(BUILDDIR)/../Cubism/include/ -DDIMENSION=2
-
+CPPFLAGS+= -D_BS_=$(bs) -I$(BUILDDIR)/../Cubism/include/ -DDIMENSION=2
 
 # Set flags for OpenMP and HDF5 libraries
 ifeq "$(openmp)" "true"
@@ -38,9 +38,6 @@ all: simulation
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
-
-%.d: %.cpp
-	$(CXX) $(CPPFLAGS) -c -MD $<
 
 clean:
 	rm -f simulation *.o
