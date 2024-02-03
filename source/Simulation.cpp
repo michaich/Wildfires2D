@@ -63,7 +63,7 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.endTime    = parser("-tend"      ).asDouble(10000. )      ; //simulation ends at t=tend (inactive if tend=0)
   
     // output parameters
-    sim.dumpTime           = parser("-tdump"        ).asDouble(10.);
+    sim.dumpTime           = parser("-tdump"        ).asDouble(0.);
     sim.path4serialization = parser("-serialization").asString("./");
     sim.verbose            = parser("-verbose"      ).asInt(1);
     sim.verbose = sim.verbose && sim.rank == 0;
@@ -76,7 +76,7 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.b2      = parser("-b2"     ).asDouble(7000);
     sim.rm0     = parser("-rm0"    ).asDouble(0.002);
     sim.rmc     = parser("-rmc"    ).asDouble(0.004);
-    sim.Anc     = parser("-Anc"    ).asDouble(1);
+    sim.Anc     = parser("-Anc"    ).asDouble(0.2);
     sim.epsilon = parser("-epsilon").asDouble(0.3);
     sim.sigmab  = parser("-sigmab" ).asDouble(5.67e-8);
     sim.H       = parser("-H"      ).asDouble(2);
@@ -95,11 +95,12 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.initialConditions.number_of_zones = parser("-zones").asInt(1);
     for (int i = 0; i < sim.initialConditions.number_of_zones; i++)
     {
-      sim.initialConditions.Ti.push_back            (parser("-Ti"             + std::to_string(i)).asDouble(1200) );
-      sim.initialConditions.xignition.push_back     (parser("-xignition"      + std::to_string(i)).asDouble(100)  );
-      sim.initialConditions.yignition.push_back     (parser("-yignition"      + std::to_string(i)).asDouble(250)  );
-      sim.initialConditions.xside_ignition.push_back(parser("-xside_ignition" + std::to_string(i)).asDouble(20)   );
-      sim.initialConditions.yside_ignition.push_back(parser("-yside_ignition" + std::to_string(i)).asDouble(30)   );
+      const std::string idx = std::to_string(i); 
+      sim.initialConditions.sigmax.push_back(parser("-sigmax"+ std::to_string(i)).asDouble(10));
+      sim.initialConditions.sigmay.push_back(parser("-sigmay"+ std::to_string(i)).asDouble(10));
+      sim.initialConditions.x0    .push_back(parser("-x"     + std::to_string(i)).asDouble(0.5*sim.extent));
+      sim.initialConditions.y0    .push_back(parser("-y"     + std::to_string(i)).asDouble(0.5*sim.extent));
+      sim.initialConditions.Tmaxi .push_back(parser("-Tmax"  + std::to_string(i)).asDouble(900));
     }
 
     sim.initialConditions.number_of_roads = parser("-roads").asInt(0);
@@ -117,7 +118,7 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.delta  = parser("-delta").asDouble(0.04);
     sim.eta    = parser("-eta"  ).asDouble(3);
     sim.kappa  = parser("-kappa").asDouble(0.41);
-    sim.u10x   = parser("-u10x" ).asDouble(5);
+    sim.u10x   = parser("-u10x" ).asDouble(7);
     sim.u10y   = parser("-u10y" ).asDouble(5);
 
     // fuel initial conditions
@@ -133,6 +134,12 @@ Simulation::Simulation(int argc, char ** argv, MPI_Comm comm) : parser(argc,argv
     sim.C4 = 1.0/(sim.H*sim.rhos*sim.cps);
     sim.gamma = sim.cpg/sim.cps;
     sim.lambda = sim.rhog/sim.rhos;
+
+    // square where the average temperature will be saved
+    xA = parser("-xA").asDouble(0.45*sim.extent);
+    yA = parser("-yA").asDouble(0.45*sim.extent);
+    xB = parser("-xB").asDouble(0.55*sim.extent);
+    yB = parser("-yB").asDouble(0.55*sim.extent);
 
     // constant velocity field, dense canopy
     {
@@ -217,10 +224,11 @@ void Simulation::simulate()
     sim.time += dt;
     sim.step++;
 
-    #if 0
+    #if 1
     //5. Save some quantities of interest (max temperature, integral of T and integral of T^2)
     const std::vector<BlockInfo>& TInfo = sim.T->getBlocksInfo();
-    double res [3] =  {0,0,0};
+    double res = 0.0;
+    double vol = 0.0;
     for (size_t i=0; i < TInfo.size(); i++)
     {
       const double h2 = TInfo[i].h*TInfo[i].h;
@@ -228,27 +236,35 @@ void Simulation::simulate()
       for(int iy=0; iy<ScalarBlock::sizeY; ++iy)
       for(int ix=0; ix<ScalarBlock::sizeX; ++ix)
       {
-        res[0]  = std::max(T(ix,iy).s,res[0]);
-        res[1] += T(ix,iy).s*h2;
-        res[2] += T(ix,iy).s*T(ix,iy).s*h2;
+        double p[2];
+        TInfo[i].pos(p,ix,iy);
+        if (xA <= p[0] && yA <= p[1] && p[0] <= xB &&  p[1] <= yB)
+        {
+          vol += h2;
+          res += T(ix,iy).s*h2;
+        }
       }
     }
-    MPI_Allreduce(MPI_IN_PLACE, &res[0], 1, MPI_DOUBLE, MPI_MAX, sim.comm);
-    MPI_Allreduce(MPI_IN_PLACE, &res[1], 2, MPI_DOUBLE, MPI_SUM, sim.comm);
-    if(sim.rank == 0)
-    {
-      std::stringstream ssF;
-      ssF<<sim.path4serialization<<"/qoi.dat";
-      std::stringstream & fout = logger.get_stream(ssF.str());
-      if(sim.step==0)
-       fout<<"t dt \n";
-      fout<<sim.time<<" "<<res[0]<<" "<<res[1]<<" "<<res[2]<<" \n";
-    }
+    Vaverage.push_back(vol);
+    Taverage.push_back(res);
+    Tsave.push_back(sim.time);
     #endif
 
     //6. Check if simulation should terminate
     if (sim.bOver())
     {
+      MPI_Allreduce(MPI_IN_PLACE, Taverage.data(), Taverage.size(), MPI_DOUBLE, MPI_SUM, sim.comm);
+      MPI_Allreduce(MPI_IN_PLACE, Vaverage.data(), Vaverage.size(), MPI_DOUBLE, MPI_SUM, sim.comm);
+      if(sim.rank == 0)
+      {
+        std::stringstream ssF;
+        ssF<<sim.path4serialization<<"/qoi.dat";
+        std::stringstream & fout = logger.get_stream(ssF.str());
+        for (size_t i = 0; i < Taverage.size(); i++)
+          fout<<Tsave[i]<<" "<<Taverage[i]/Vaverage[i]<<" \n";
+      }
+
+
       if( sim.bDump() )
       {
         if(sim.verbose) std::cout << "[WS2D] dumping fields...\n";

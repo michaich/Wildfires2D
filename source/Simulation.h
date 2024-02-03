@@ -13,6 +13,12 @@ class Simulation
   ~Simulation();
   void simulate();
 
+  //Quantity of interest, average temperature in rectangle [xA,xB]x[yA,yB]
+  double xA,yA,xB,yB;
+  std::vector<double> Taverage;
+  std::vector<double> Vaverage;
+  std::vector<double> Tsave;
+
  protected:
   cubism::ArgumentParser parser;
   double calcMaxTimestep();

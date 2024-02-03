@@ -32,26 +32,24 @@ void IC::operator()(const double dt)
       {
         S1(ix,iy).s = distributionS1(generator);
         S2(ix,iy).s = distributionS2(generator);
-        T(ix,iy).s = Ta;
-
 
         double p[2];
         TInfo[i].pos(p,ix,iy);
         const double x = p[0];
         const double y = p[1];
+        T(ix,iy).s = Ta; 
 
-        //check if we are in a road or an ingition zone
+        ////check if we are in a road or an ingition zone
         for (int n = 0; n < sim.initialConditions.number_of_zones; n++)
         {
-          const double Ti      = sim.initialConditions.Ti            [n];
-          const double xcenter = sim.initialConditions.xignition     [n];
-          const double ycenter = sim.initialConditions.yignition     [n];
-          const double xside   = sim.initialConditions.xside_ignition[n];
-          const double yside   = sim.initialConditions.yside_ignition[n];
-          if ( std::fabs(x-xcenter) < 0.5*xside && std::fabs(y-ycenter) < 0.5*yside)
-          {
-            T(ix,iy).s = Ti;
-          }
+          const double Tmaxi = sim.initialConditions.Tmaxi [n];
+          const double x0    = sim.initialConditions.x0    [n];
+          const double y0    = sim.initialConditions.y0    [n];
+          const double sx    = sim.initialConditions.sigmax[n];
+          const double sy    = sim.initialConditions.sigmay[n];
+          const double dx    = (x-x0)/sx;
+          const double dy    = (y-y0)/sy;
+          T(ix,iy).s += Tmaxi*exp(-dx*dx-dy*dy);;
         }
         for (int n = 0; n < sim.initialConditions.number_of_roads; n++)
         {

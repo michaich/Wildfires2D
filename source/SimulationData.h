@@ -102,11 +102,11 @@ struct SimulationData
 
     //ignition zones
     int number_of_zones;
-    std::vector<double> Ti;
-    std::vector<double> xignition;
-    std::vector<double> yignition;
-    std::vector<double> xside_ignition;
-    std::vector<double> yside_ignition;
+    std::vector<double> Tmaxi;
+    std::vector<double> x0;
+    std::vector<double> y0;
+    std::vector<double> sigmax;
+    std::vector<double> sigmay;
 
     //roads (zero starting fuel)
     int number_of_roads;
